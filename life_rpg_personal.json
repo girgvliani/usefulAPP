@@ -1,0 +1,243 @@
+{
+  "life_areas": {
+    "Health - Exercise": {
+      "level": 1,
+      "xp": 0,
+      "last_active": "2025-10-18"
+    },
+    "Health - Sleep": {
+      "level": 1,
+      "xp": 10,
+      "last_active": "2025-10-19"
+    },
+    "Health - Hygiene": {
+      "level": 1,
+      "xp": 0,
+      "last_active": "2025-10-18"
+    },
+    "University - Databases": {
+      "level": 1,
+      "xp": 0,
+      "last_active": "2025-10-18"
+    },
+    "University - Software engineering": {
+      "level": 1,
+      "xp": 0,
+      "last_active": "2025-10-18"
+    },
+    "University - App development": {
+      "level": 1,
+      "xp": 0,
+      "last_active": "2025-10-18"
+    },
+    "University - CyberSecurity": {
+      "level": 1,
+      "xp": 0,
+      "last_active": "2025-10-18"
+    },
+    "University - Fuzzing": {
+      "level": 1,
+      "xp": 0,
+      "last_active": "2025-10-18"
+    },
+    "University - Research Basics": {
+      "level": 1,
+      "xp": 0,
+      "last_active": "2025-10-18"
+    },
+    "Work Skills - Gintama": {
+      "level": 1,
+      "xp": 0,
+      "last_active": "2025-10-18"
+    },
+    "Work Skills - React": {
+      "level": 1,
+      "xp": 0,
+      "last_active": "2025-10-18"
+    },
+    "Work Skills - SEO": {
+      "level": 1,
+      "xp": 0,
+      "last_active": "2025-10-18"
+    },
+    "Work Skills - DevOps": {
+      "level": 1,
+      "xp": 0,
+      "last_active": "2025-10-18"
+    },
+    "Work Skills - Databases": {
+      "level": 1,
+      "xp": 0,
+      "last_active": "2025-10-18"
+    },
+    "Work Skills - iOS": {
+      "level": 1,
+      "xp": 0,
+      "last_active": "2025-10-18"
+    },
+    "Work Skills - Android": {
+      "level": 1,
+      "xp": 0,
+      "last_active": "2025-10-18"
+    },
+    "Personal Sciences - Math": {
+      "level": 1,
+      "xp": 0,
+      "last_active": "2025-10-18"
+    },
+    "Personal Sciences - Physics": {
+      "level": 1,
+      "xp": 0,
+      "last_active": "2025-10-18"
+    },
+    "Personal Sciences - Chemistry": {
+      "level": 1,
+      "xp": 0,
+      "last_active": "2025-10-18"
+    },
+    "Personal Sciences - Game Dev": {
+      "level": 1,
+      "xp": 0,
+      "last_active": "2025-10-18"
+    },
+    "Memory Techniques": {
+      "level": 1,
+      "xp": 0,
+      "last_active": "2025-10-18"
+    },
+    "Social Balance": {
+      "level": 1,
+      "xp": 0,
+      "last_active": "2025-10-18"
+    }
+  },
+  "projects": [
+    {
+      "id": 1,
+      "name": "DG constulting web",
+      "value": 1000,
+      "deadline": "2025-10-22",
+      "completed": false,
+      "completion_date": null,
+      "created": "2025-10-18"
+    }
+  ],
+  "todos": [
+    {
+      "id": 1,
+      "task": "Send emails to Dg employees",
+      "area": "Work Skills - Gintama",
+      "base_xp": 2,
+      "deadline": "2025-10-20",
+      "completed": false,
+      "created": "2025-10-18"
+    },
+    {
+      "id": 2,
+      "task": "HW3 for SE",
+      "area": "University - Software engineering",
+      "base_xp": 1,
+      "deadline": "2025-10-20",
+      "completed": false,
+      "created": "2025-10-18"
+    },
+    {
+      "id": 3,
+      "task": "Car parking",
+      "area": "Work Skills - Gintama",
+      "base_xp": 2,
+      "deadline": "2025-10-20",
+      "completed": false,
+      "created": "2025-10-18"
+    },
+    {
+      "id": 4,
+      "task": "inex delivery",
+      "area": "Work Skills - Gintama",
+      "base_xp": 1,
+      "deadline": "2025-10-20",
+      "completed": false,
+      "created": "2025-10-18"
+    },
+    {
+      "id": 5,
+      "task": "clean fridge take out trash",
+      "area": "Health - Hygiene",
+      "base_xp": 2,
+      "deadline": "2025-10-19",
+      "completed": false,
+      "created": "2025-10-18"
+    }
+  ],
+  "habits": {
+    "shower": {
+      "streak": 1,
+      "last_done": "2025-10-18"
+    },
+    "workout": {
+      "streak": 1,
+      "last_done": "2025-10-18",
+      "pushup_history": [
+        {
+          "date": "2025-10-18",
+          "count": 100
+        }
+      ]
+    }
+  },
+  "epic_milestones": {
+    "algorithms_paper": {
+      "completed": false,
+      "xp_reward": 847,
+      "description": "Research paper on algorithms"
+    },
+    "codeforces_2000": {
+      "completed": false,
+      "xp_reward": 1203,
+      "description": "2000 Elo on Codeforces"
+    },
+    "weight_107kg": {
+      "completed": false,
+      "xp_reward": 672,
+      "description": "Reach 107 kg weight"
+    },
+    "edinburgh_masters": {
+      "completed": false,
+      "xp_reward": 1847,
+      "description": "Edinburgh University Masters acceptance"
+    },
+    "gold_medal": {
+      "completed": false,
+      "xp_reward": 2341,
+      "description": "Gold medal at international championship"
+    }
+  },
+  "screen_time": {
+    "daily_log": {},
+    "weekly_violations": 0
+  },
+  "social_interactions": {
+    "weekly_count": 1,
+    "week_start": "2025-10-18"
+  },
+  "income": {
+    "monthly_goal": 10000,
+    "current_month_earnings": 0,
+    "target_month": "2025-02",
+    "manual_override": null
+  },
+  "daily_scores": [
+    {
+      "date": "2025-10-18",
+      "score": 35,
+      "grade": "F"
+    },
+    {
+      "date": "2025-10-19",
+      "score": 15,
+      "grade": "F"
+    }
+  ],
+  "achievements": [],
+  "last_login": "2025-10-19"
+}

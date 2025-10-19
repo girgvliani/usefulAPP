@@ -7,7 +7,7 @@ import random
 class PersonalLifeRPG:
     def __init__(self, data_file='life_rpg_personal.json'):
         self.data_file = data_file
-        self.DAILY_DECAY = 15  # Same as base exercise XP
+        self.DAILY_DECAY = 5  # Same as base exercise XP
         self.PUSHUP_REQUIREMENT = 100
         self.SCREEN_TIME_LIMIT = 2  # hours
         self.SOCIAL_LIMIT = 3  # times per week
@@ -29,10 +29,13 @@ class PersonalLifeRPG:
                 'Health - Exercise': {'level': 1, 'xp': 0, 'last_active': self.today()},
                 'Health - Sleep': {'level': 1, 'xp': 0, 'last_active': self.today()},
                 'Health - Hygiene': {'level': 1, 'xp': 0, 'last_active': self.today()},
-                'University - Math': {'level': 1, 'xp': 0, 'last_active': self.today()},
-                'University - Physics': {'level': 1, 'xp': 0, 'last_active': self.today()},
-                'University - Chemistry': {'level': 1, 'xp': 0, 'last_active': self.today()},
-                'University - Computer Science': {'level': 1, 'xp': 0, 'last_active': self.today()},
+                'University - Databases': {'level': 1, 'xp': 0, 'last_active': self.today()},
+                'University - Software engineering': {'level': 1, 'xp': 0, 'last_active': self.today()},
+                'University - App development': {'level': 1, 'xp': 0, 'last_active': self.today()},
+                'University - CyberSecurity': {'level': 1, 'xp': 0, 'last_active': self.today()},
+                'University - Fuzzing': {'level': 1, 'xp': 0, 'last_active': self.today()},
+                'University - Research Basics': {'level': 1, 'xp': 0, 'last_active': self.today()},
+                'Work Skills - Gintama': {'level': 1, 'xp': 0, 'last_active': self.today()},
                 'Work Skills - React': {'level': 1, 'xp': 0, 'last_active': self.today()},
                 'Work Skills - SEO': {'level': 1, 'xp': 0, 'last_active': self.today()},
                 'Work Skills - DevOps': {'level': 1, 'xp': 0, 'last_active': self.today()},
@@ -218,7 +221,7 @@ class PersonalLifeRPG:
     def log_sleep(self, hours):
         """Log sleep hours"""
         xp = 0
-        if hours >= 7 and hours <= 9:
+        if hours >= 7 and hours <= 8:
             xp = 20
             msg = "Optimal sleep!"
         elif hours >= 6:
