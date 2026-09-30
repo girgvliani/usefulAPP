@@ -9,6 +9,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    JSON,
     String,
     UniqueConstraint,
     func,
@@ -21,6 +22,15 @@ from app.database import Base
 class HabitType(str, enum.Enum):
     shower = "shower"
     workout = "workout"
+
+
+class GoalType(str, enum.Enum):
+    weight = "weight"            # kg, from logged weight
+    max_pushups = "max_pushups"  # reps in one set, from push-up tests
+    steps = "steps"              # 7-day average steps
+    sleep = "sleep"              # 7-day average hours
+    income = "income"            # this month's earnings
+    custom = "custom"            # anything else; current value entered by hand
 
 
 class User(Base):
@@ -169,3 +179,88 @@ class Achievement(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     unlocked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class DailyLog(Base):
+    """One row per user per day, shaped like the check-in: {section: {field: value}}.
+    `auto` is written by devices (phone sync), `manual` by check-ins; manual wins per field."""
+    __tablename__ = "daily_logs"
+    __table_args__ = (UniqueConstraint("user_id", "date", name="uq_daily_log_user_date"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    date: Mapped[date] = mapped_column(Date, nullable=False)
+    auto: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    manual: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class DeviceToken(Base):
+    """Long-lived token for something that syncs without a login, like the phone app.
+    Only the SHA-256 of the token is stored; the token itself is shown once."""
+    __tablename__ = "device_tokens"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class UserProfile(Base):
+    """Personal settings. The stat formulas are the same for everyone; these targets are each user's own."""
+    __tablename__ = "user_profiles"
+    __table_args__ = (UniqueConstraint("user_id", name="uq_profile_user"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    display_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    timezone: Mapped[str] = mapped_column(String(64), nullable=False)
+    pushup_target: Mapped[int] = mapped_column(Integer, nullable=False)  # push-ups a day
+    steps_target: Mapped[int] = mapped_column(Integer, nullable=False)   # steps a day
+    sleep_target: Mapped[float] = mapped_column(Float, nullable=False)   # hours a night; sets MP's sleep debt
+    # For the calorie target (Mifflin-St Jeor); weight comes from the daily logs
+    height_cm: Mapped[float | None] = mapped_column(Float, nullable=True)
+    birth_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    sex: Mapped[str | None] = mapped_column(String(6), nullable=True)  # "male" / "female"
+
+
+class Goal(Base):
+    """An outcome to reach. Losing (95 -> 85 kg) and gaining (70 -> 80 kg) use the same row:
+    the direction comes from start vs target."""
+    __tablename__ = "goals"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    type: Mapped[GoalType] = mapped_column(Enum(GoalType), nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    unit: Mapped[str] = mapped_column(String(20), nullable=False)
+    start_value: Mapped[float] = mapped_column(Float, nullable=False)
+    target_value: Mapped[float] = mapped_column(Float, nullable=False)
+    current_value: Mapped[float | None] = mapped_column(Float, nullable=True)  # custom goals only
+    # Goggins scale: how hard to go after it, 1-10. At 8+ the phone app nags you off distracting apps.
+    intensity: Mapped[int] = mapped_column(Integer, nullable=False, default=5, server_default="5")
+    deadline: Mapped[date | None] = mapped_column(Date, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Meal(Base):
+    """One meal, usually from a photo the AI read. Totals are the sum of `items`."""
+    __tablename__ = "meals"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    date: Mapped[date] = mapped_column(Date, index=True, nullable=False)  # the user's local day
+    eaten_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    meal_type: Mapped[str] = mapped_column(String(10), nullable=False)  # breakfast / lunch / dinner / snack
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    items: Mapped[list] = mapped_column(JSON, default=list, nullable=False)  # [{name, grams, kcal, protein, carbs, fat}]
+    kcal: Mapped[float] = mapped_column(Float, nullable=False)
+    protein: Mapped[float] = mapped_column(Float, nullable=False)
+    carbs: Mapped[float] = mapped_column(Float, nullable=False)
+    fat: Mapped[float] = mapped_column(Float, nullable=False)
+    source: Mapped[str] = mapped_column(String(12), nullable=False)  # photo / manual
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)  # the AI's own 0-1 estimate
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

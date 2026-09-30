@@ -1,3 +1,5 @@
+import hashlib
+import secrets
 from datetime import datetime, timedelta, timezone
 
 from jose import JWTError, jwt
@@ -6,6 +8,8 @@ from passlib.context import CryptContext
 from app.config import settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+DEVICE_TOKEN_PREFIX = "lrpg_"
 
 
 def hash_password(password: str) -> str:
@@ -46,3 +50,13 @@ def decode_token(token: str, expected_type: str) -> int | None:
         return int(payload["sub"])
     except (KeyError, ValueError, TypeError):
         return None
+
+
+def new_device_token() -> tuple[str, str]:
+    """Returns (token to show the user once, hash to store)."""
+    token = DEVICE_TOKEN_PREFIX + secrets.token_urlsafe(32)
+    return token, hash_device_token(token)
+
+
+def hash_device_token(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()

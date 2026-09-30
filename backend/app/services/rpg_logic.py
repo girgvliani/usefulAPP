@@ -10,6 +10,8 @@ from datetime import date
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.services import profiles
+
 from app.models import (
     Achievement,
     DailyScore,
@@ -27,57 +29,40 @@ from app.models import (
 )
 
 DAILY_DECAY = 5
-PUSHUP_REQUIREMENT = 100
 SCREEN_TIME_LIMIT = 2
 SOCIAL_LIMIT = 3
 
+# General areas for a new account; everyone renames or adds their own
 DEFAULT_LIFE_AREAS = [
     "Health - Exercise",
     "Health - Sleep",
     "Health - Hygiene",
-    "University - Databases",
-    "University - Software engineering",
-    "University - App development",
-    "University - CyberSecurity",
-    "University - Fuzzing",
-    "University - Research Basics",
-    "Work Skills - Gintama",
-    "Work Skills - React",
-    "Work Skills - SEO",
-    "Work Skills - DevOps",
-    "Work Skills - Databases",
-    "Work Skills - iOS",
-    "Work Skills - Android",
-    "Personal Sciences - Math",
-    "Personal Sciences - Physics",
-    "Personal Sciences - Chemistry",
-    "Personal Sciences - Game Dev",
-    "Memory Techniques",
+    "Learning - Study",
+    "Learning - Reading",
+    "Career - Work Skills",
+    "Career - Side Projects",
+    "Mind - Focus",
     "Social Balance",
 ]
 
-DEFAULT_MILESTONES = [
-    ("algorithms_paper", "Research paper on algorithms", 847),
-    ("codeforces_2000", "2000 Elo on Codeforces", 1203),
-    ("weight_107kg", "Reach 107 kg weight", 672),
-    ("edinburgh_masters", "Edinburgh University Masters acceptance", 1847),
-    ("gold_medal", "Gold medal at international championship", 2341),
-]
+# Habit and social XP land in these areas by name, so they can't be renamed or deleted
+PROTECTED_AREAS = {"Health - Exercise", "Health - Sleep", "Health - Hygiene", "Social Balance"}
+
 
 ACHIEVEMENT_THRESHOLDS = {5: "Bronze", 10: "Silver", 20: "Gold", 30: "Platinum"}
 
 
 def seed_new_user(db: Session, user: User) -> None:
-    """Create the default life areas, habits, milestones, income and social rows for a new account."""
+    """Neutral starting rows for a new account: general life areas, habits, no milestones, no income goal.
+    Everyone adds their own milestones and goals."""
     for name in DEFAULT_LIFE_AREAS:
         db.add(LifeArea(user_id=user.id, name=name, level=1, xp=0))
     db.add(Habit(user_id=user.id, type=HabitType.shower, streak=0))
     db.add(Habit(user_id=user.id, type=HabitType.workout, streak=0))
-    for key, description, xp_reward in DEFAULT_MILESTONES:
-        db.add(EpicMilestone(user_id=user.id, key=key, description=description, xp_reward=xp_reward, completed=False))
-    db.add(Income(user_id=user.id, monthly_goal=10000, current_month_earnings=0, target_month=""))
+    db.add(Income(user_id=user.id, monthly_goal=0, current_month_earnings=0, target_month=""))
     db.add(SocialInteraction(user_id=user.id, week_start=date.today(), weekly_count=0))
     db.commit()
+    profiles.get_profile(db, user)
 
 
 def calculate_level(xp: int) -> int:
@@ -164,11 +149,12 @@ def track_pushups(db: Session, user: User, count: int) -> dict:
     habit.last_done = today
     db.add(PushupLog(user_id=user.id, date=today, count=count))
 
-    result = {"met_requirement": count >= PUSHUP_REQUIREMENT, "bonus_xp": 0, "consistency_bonus": 0, "xp_result": None}
-    if count >= PUSHUP_REQUIREMENT:
+    requirement = profiles.get_profile(db, user).pushup_target
+    result = {"met_requirement": count >= requirement, "bonus_xp": 0, "consistency_bonus": 0, "xp_result": None}
+    if count >= requirement:
         xp = DAILY_DECAY
-        if count > PUSHUP_REQUIREMENT:
-            bonus = min((count - PUSHUP_REQUIREMENT) // 10, 10)
+        if count > requirement:
+            bonus = min((count - requirement) // 10, 10)
             xp += bonus
             result["bonus_xp"] = bonus
         if habit.streak >= 7:

@@ -1,14 +1,14 @@
-from datetime import date
+from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import get_current_user
 from app.models import DailyScore, EpicMilestone, Habit, Income, LifeArea, User
-from app.schemas import DailyScoreOut, HabitStatus, StatsOut
-from app.services import rpg_logic
+from app.schemas import CharacterDay, CharacterSheetOut, DailyScoreOut, HabitStatus, LevelOut, StatResult, StatsOut, StreaksOut
+from app.services import character_stats, daily_logs, levels, profiles, rpg_logic, streaks
 
 router = APIRouter(prefix="/stats", tags=["stats"])
 
@@ -43,3 +43,61 @@ def preview_daily_summary(current_user: User = Depends(get_current_user), db: Se
 @router.post("/daily-summary/finalize", response_model=DailyScoreOut)
 def finalize_daily_summary(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     return rpg_logic.finalize_daily_summary(db, current_user)
+
+
+def _sheet(db: Session, user: User, data: dict, day: date) -> dict:
+    """Shared formulas, personal targets."""
+    profile = profiles.get_profile(db, user)
+    return character_stats.character_sheet(data, day.isoformat(), profile.pushup_target, profile.sleep_target)
+
+
+@router.get("/character", response_model=CharacterSheetOut)
+def character_sheet(day: date | None = None, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """MP, PS, STA, INT, DIS, SOC, WLT for one day (default: today in the configured timezone)."""
+    day = day or profiles.today(db, current_user)
+    data = daily_logs.stats_input(db, current_user, day)
+    sheet = _sheet(db, current_user, data, day)
+    grade = lambda score: character_stats.grade(score) if score is not None else None
+    return CharacterSheetOut(
+        date=day,
+        overall=sheet['overall'],
+        overall_grade=grade(sheet['overall']),
+        stats=[
+            StatResult(code=code, name=name, grade=grade(sheet['stats'][code]['score']), **sheet['stats'][code])
+            for code, name in character_stats.STATS
+        ],
+    )
+
+
+MAX_HISTORY_DAYS = 92
+
+
+@router.get("/character/history", response_model=list[CharacterDay])
+def character_history(
+    start: date, end: date | None = None, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    """Every stat's score for each day from start to end (default today), for charts."""
+    end = end or profiles.today(db, current_user)
+    if end < start or (end - start).days >= MAX_HISTORY_DAYS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Range must be 1-{MAX_HISTORY_DAYS} days")
+    data = daily_logs.stats_input(db, current_user, end, start)
+    history = []
+    for offset in range((end - start).days + 1):
+        day = start + timedelta(days=offset)
+        sheet = _sheet(db, current_user, data, day)
+        history.append(CharacterDay(
+            date=day, overall=sheet['overall'], scores={code: stat['score'] for code, stat in sheet['stats'].items()}
+        ))
+    return history
+
+
+@router.get("/streaks", response_model=StreaksOut)
+def get_streaks(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Every streak with today's state, plus a mood for the home-screen widget."""
+    return streaks.streaks(db, current_user)
+
+
+@router.get("/level", response_model=LevelOut)
+def get_level(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Global level and XP from every source, plus what today has earned so far."""
+    return levels.summary(db, current_user)
