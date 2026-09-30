@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Life RPG Sync</string>
+    <string name="widget_description">Your streaks and rank. Gets angry when a streak is about to break.</string>
+    <string name="privacy_title">What Life RPG Sync reads</string>
+    <string name="privacy_text">Life RPG Sync reads your steps, workouts, sleep, weight and resting heart rate from Health Connect, and how long you use each app from Android\'s usage access.\n\nOnce an hour it sends a daily summary to the server address you entered, and nowhere else. Nothing is shared with anyone else, and nothing is sent until you enter a server and token.</string>
+</resources>
