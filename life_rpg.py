@@ -3,6 +3,12 @@ import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 import os
 import random
+from backend.app.services import character_stats as stats
+
+# One color per stat, so the future round chart can reuse them
+STAT_COLORS = {'MP': '\033[95m', 'PS': '\033[91m', 'STA': '\033[93m', 'H': '\033[32m', 'INT': '\033[94m',
+               'DIS': '\033[96m', 'FOC': '\033[97m', 'SOC': '\033[92m', 'WLT': '\033[33m'}
+RESET = '\033[0m'
 
 class PersonalLifeRPG:
     def __init__(self, data_file='life_rpg_personal.json'):
@@ -18,7 +24,9 @@ class PersonalLifeRPG:
         """Load existing data or create new profile"""
         if os.path.exists(self.data_file):
             with open(self.data_file, 'r') as f:
-                return json.load(f)
+                data = json.load(f)
+            data.setdefault('daily_logs', {})
+            return data
         else:
             return self.create_initial_data()
     
@@ -77,6 +85,7 @@ class PersonalLifeRPG:
                 'manual_override': None
             },
             'daily_scores': [],
+            'daily_logs': {},
             'achievements': [],
             'last_login': self.today()
         }
@@ -397,29 +406,7 @@ class PersonalLifeRPG:
         if self.data['social_interactions']['weekly_count'] <= self.SOCIAL_LIMIT:
             score += 15
         
-        # Convert to grade
-        if score >= 95:
-            grade = "SSS"
-        elif score >= 90:
-            grade = "SS"
-        elif score >= 85:
-            grade = "S"
-        elif score >= 80:
-            grade = "A+"
-        elif score >= 75:
-            grade = "A"
-        elif score >= 70:
-            grade = "A-"
-        elif score >= 60:
-            grade = "B"
-        elif score >= 50:
-            grade = "C"
-        elif score >= 40:
-            grade = "D"
-        else:
-            grade = "F"
-        
-        return score, grade
+        return score, stats.grade(score)
     
     def daily_summary(self):
         """Show end of day summary"""
@@ -504,6 +491,96 @@ class PersonalLifeRPG:
         
         print("\n" + "="*70)
     
+    def log_day(self, day, answers):
+        """Merge check-in answers into a day's log; unanswered (None) fields keep what was there"""
+        entry = self.data['daily_logs'].setdefault(day, {})
+        for section, fields in answers.items():
+            target = entry.setdefault(section, {})
+            for key, value in fields.items():
+                if value is not None:
+                    target[key] = value
+        self.save_data()
+        return entry
+
+    def add_learning_minutes(self, minutes):
+        """Count a learning session toward today's INT"""
+        today = self.data['daily_logs'].get(self.today(), {})
+        so_far = stats.field(today, 'mind', 'learning_min') or 0
+        self.log_day(self.today(), {'mind': {'learning_min': so_far + minutes}})
+
+    def award_checkin_xp(self):
+        """Feed today's check-in into the XP systems, once per day each"""
+        entry = self.data['daily_logs'][self.today()]
+        done = entry.setdefault('xp_awarded', [])
+
+        hours = stats.field(entry, 'sleep', 'hours')
+        if hours is not None and 'sleep' not in done:
+            done.append('sleep')
+            self.log_sleep(hours)
+
+        pushups = stats.field(entry, 'body', 'pushups')
+        if pushups and 'pushups' not in done:
+            done.append('pushups')
+            self.track_pushups(pushups)
+
+        if stats.field(entry, 'body', 'shower') and 'shower' not in done:
+            done.append('shower')
+            self.check_shower()
+
+        screen = entry.get('screen', {})
+        if screen and 'screen' not in done:
+            done.append('screen')
+            minutes = sum(screen.get(k) or 0 for k in ('short_video_min', 'long_video_min', 'gaming_min'))
+            self.track_screen_time(round(minutes / 60, 1))
+
+        self.save_data()
+
+    def print_breakdown(self, code, result):
+        """Show how a stat's score was built"""
+        color = STAT_COLORS[code]
+        print(f"\n{color}🔍 {code} breakdown{RESET}")
+        for c in result['components']:
+            if c['score'] is None:
+                print(f"   {c['name']:26} {'—':>9}   {c['note']}")
+            else:
+                points = c['score'] * c['weight']
+                print(f"   {c['name']:26} {points:5.1f}/{c['weight']:<3}  {c['note']}")
+        for p in result['penalties']:
+            print(f"   ⚠️  {p['name']:23} {-p['points']:>6g}      {p['note']}")
+        if result['ceiling'] is not None:
+            print(f"   🔒 Max {result['ceiling']} today ({result['ceiling_note']})")
+        if result['score'] is not None and result['confidence'] < 100:
+            print(f"   ℹ️  {100 - result['confidence']}% of the formula had no data; the rest was scaled up to fill in")
+        if result['best_move']:
+            print(f"   💡 Biggest gain: {result['best_move']['name']} (up to +{result['best_move']['points']})")
+
+    def view_character_sheet(self, day=None):
+        """MP, PS, STA, INT, DIS, FOC, SOC, WLT with ranks"""
+        day = day or self.today()
+        sheet = stats.character_sheet(self.data, day, self.PUSHUP_REQUIREMENT)
+
+        print("\n" + "="*70)
+        print(f"🧬 CHARACTER SHEET · {day}".center(70))
+        print("="*70)
+        for code, name in stats.STATS:
+            result = sheet['stats'][code]
+            color = STAT_COLORS[code]
+            if result['score'] is None:
+                print(f"  {color}{code:4} {name:18}{RESET} | {result['components'][0]['note']}")
+                continue
+            score = result['score']
+            bar = "█" * (score // 10) + "░" * (10 - score // 10)
+            print(f"  {color}{code:4} {name:18} [{bar}] {score:3}  {stats.grade(score):3}{RESET} | data {result['confidence']:3}%")
+        print("-"*70)
+        if sheet['overall'] is not None:
+            print(f"  OVERALL RANK: {stats.grade(sheet['overall'])} ({sheet['overall']}/100)")
+        print("="*70)
+
+        self.print_breakdown('MP', sheet['stats']['MP'])
+        if input("\nShow breakdowns for the other stats? (y/n): ").strip().lower() in ('y', 'yes'):
+            for code, _ in stats.STATS[1:]:
+                self.print_breakdown(code, sheet['stats'][code])
+
     def create_visualization(self):
         """Create comprehensive visualization"""
         fig = plt.figure(figsize=(16, 10))
@@ -580,7 +657,91 @@ class PersonalLifeRPG:
         plt.show()
 
 
+def ask(prompt, cast=float):
+    """Ask for a value; a blank answer returns None (skip / keep what was logged)"""
+    while True:
+        raw = input(f"   {prompt}: ").strip()
+        if not raw:
+            return None
+        try:
+            return cast(raw)
+        except (ValueError, KeyError):
+            print("   ❌ Didn't understand that, try again (Enter to skip)")
+
+
+def ask_yes_no(prompt):
+    answers = {'y': True, 'yes': True, 'n': False, 'no': False}
+    return ask(f"{prompt} (y/n)", lambda raw: answers[raw.lower()])
+
+
+def as_time(raw):
+    return datetime.strptime(raw, '%H:%M').strftime('%H:%M')
+
+
+def as_date(raw):
+    return datetime.strptime(raw, '%Y-%m-%d').strftime('%Y-%m-%d')
+
+
+def run_checkin(rpg):
+    """One questionnaire that feeds every stat. Run it again later the same day to fill gaps."""
+    print("\n🗓️  DAILY CHECK-IN (press Enter to skip anything you don't know)")
+    day = ask("Date YYYY-MM-DD (Enter = today)", as_date) or rpg.today()
+
+    print("\n😴 SLEEP (the night before this day)")
+    bed = ask("Fell asleep at HH:MM", as_time)
+    wake = ask("Woke up at HH:MM", as_time)
+    hours = stats.sleep_hours(bed, wake) if bed and wake else ask("Hours slept")
+    quality = ask("Sleep score from your watch (0-100), or rate it 1-5")
+    if quality is not None and quality <= 5:
+        quality *= 20
+    sleep = {
+        'bed': bed, 'wake': wake, 'hours': hours, 'quality': quality,
+        'alcohol': ask("Alcoholic drinks that evening (0 if none)", int),
+        'late_caffeine': ask_yes_no("Coffee / energy drink within 6h of bedtime?"),
+        'screen_before_bed': ask_yes_no("Phone or PC in the last hour before sleep?"),
+    }
+
+    print("\n💼 WORK & STUDY")
+    work = {
+        'total': ask("Total hours worked (job + freelance + uni)"),
+        'deep': ask("Of those, hours of deep focus (one task, no notifications)"),
+    }
+    mind = {
+        'learning_min': ask("Minutes learning something new (courses, docs, reading)", int),
+        'meditation_min': ask("Minutes of meditation (0 if none)", int),
+    }
+
+    print("\n📱 SCREEN (for fun, not for work)")
+    screen = {
+        'short_video_min': ask("Reels / TikTok / Shorts minutes", int),
+        'long_video_min': ask("YouTube / series / TV minutes", int),
+        'gaming_min': ask("Gaming minutes", int),
+    }
+
+    print("\n🏃 BODY")
+    body = {
+        'steps': ask("Steps", int),
+        'active_min': ask("Minutes of brisk walking, gym or sport", int),
+        'pushups': ask("Push-ups (total today)", int),
+        'max_pushups': ask("Max push-ups in ONE set (only on test days)", int),
+        'strength': ask_yes_no("Other strength training today?"),
+        'outdoor_min': ask("Minutes outdoors", int),
+        'shower': ask_yes_no("Showered?"),
+    }
+
+    print("\n👥 SOCIAL")
+    social = {'interactions': ask("Meaningful contacts (30+ min, in person or call)", int)}
+
+    rpg.log_day(day, {'sleep': sleep, 'work': work, 'mind': mind, 'screen': screen,
+                      'body': body, 'social': social})
+    if day == rpg.today():
+        rpg.award_checkin_xp()
+    print(f"\n✅ Check-in saved for {day}")
+    rpg.view_character_sheet(day)
+
+
 def main():
+    os.system('')  # turns on ANSI colors in the Windows console
     rpg = PersonalLifeRPG()
     
     while True:
@@ -605,7 +766,9 @@ def main():
         print("16. 🎨 Generate Dashboard")
         print("17. 📊 Daily Summary")
         print("18. 🔧 Manual XP Adjustment")
-        print("19. ❌ Exit")
+        print("19. 🗓️  Daily Check-in (feeds MP, PS, STA...)")
+        print("20. 🧬 Character Sheet")
+        print("0.  ❌ Exit")
         print("="*60)
         
         choice = input("\n👉 Choose option: ").strip()
@@ -682,6 +845,7 @@ def main():
             xp = int(hours * 20)  # 20 XP per hour
             topic = input("What did you study? ")
             rpg.add_xp(area, xp, f"{hours}h on {topic}")
+            rpg.add_learning_minutes(round(hours * 60))
         
         elif choice == '12':
             minutes = int(input("Memory practice minutes: "))
@@ -761,6 +925,12 @@ def main():
             rpg.add_xp(area, xp, reason)
         
         elif choice == '19':
+            run_checkin(rpg)
+
+        elif choice == '20':
+            rpg.view_character_sheet()
+
+        elif choice == '0':
             print("\n🎮 Keep grinding! See you tomorrow! 🚀")
             rpg.daily_summary()
             break
