@@ -273,7 +273,7 @@ def complete_project(db: Session, user: User, project_id: int) -> Project | None
     base_xp = project.value // 10
     xp = int(base_xp * multiplier)
 
-    work_areas = [a for a in _life_areas(db, user) if a.name.startswith("Work Skills")]
+    work_areas = [a for a in _life_areas(db, user) if "Work Skills" in a.name]  # "Work Skills - X" or "Career - Work Skills"
     if work_areas:
         xp_per_area = xp // len(work_areas)
         for area in work_areas:
