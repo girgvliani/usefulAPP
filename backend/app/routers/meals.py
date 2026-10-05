@@ -80,7 +80,9 @@ def log_photo(
     try:
         read = nutrition.read_photo(image, photo.content_type, note)
     except nutrition.PhotoError as e:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+        # Busy / out of quota is Google's side and passes; anything else is about this photo
+        code = status.HTTP_503_SERVICE_UNAVAILABLE if e.busy else status.HTTP_422_UNPROCESSABLE_ENTITY
+        raise HTTPException(status_code=code, detail=str(e))
     return _save(db, current_user, read["name"], read["items"], moment, None, "photo", read["confidence"])
 
 
