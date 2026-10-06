@@ -294,6 +294,15 @@ class BodyLog(LogSection):
     shower: bool | None = None
     weight_kg: float | None = Field(default=None, ge=20, le=400)
     resting_hr: int | None = Field(default=None, ge=20, le=250)
+    run_km: float | None = Field(default=None, ge=0, le=500)          # all running workouts that day
+    longest_run_km: float | None = Field(default=None, ge=0, le=500)  # the longest single run
+    squats: int | None = Field(default=None, ge=0, le=5000)
+    situps: int | None = Field(default=None, ge=0, le=5000)
+    # Counted by the phone's camera rep counter (also added into pushups / squats / situps)
+    cam_pushups: int | None = Field(default=None, ge=0, le=5000)
+    cam_squats: int | None = Field(default=None, ge=0, le=5000)
+    cam_situps: int | None = Field(default=None, ge=0, le=5000)
+    cam_best_set: int | None = Field(default=None, ge=0, le=1000)  # most push-ups in one counted set
 
 
 class SocialLog(LogSection):
@@ -406,6 +415,8 @@ class ProfileOut(BaseModel):
     display_name: str | None
     nickname: str | None = None
     public_name: Literal["name", "nickname", "code"] = "nickname"  # what friends and the leaderboard see
+    photo_url: str | None = None  # /photos/{token}.jpg, relative to the API
+    title: str | None = None  # the achievement title you wear, if any
     currency: str
     timezone: str
     pushup_target: int
@@ -586,5 +597,6 @@ class LevelOut(BaseModel):
     next_level_xp: int  # XP where the next one begins
     today_xp: int
     today: list[XpItem]
-    sources: dict[str, int]  # activity / quests / goals
+    sources: dict[str, int]  # activity / quests / goals / achievements
     history: list[XpDay]  # activity XP per day, last 30 days, oldest first
+    new_achievements: list[dict] = []  # earned since the unlock screen was last seen: show them, then POST /achievements/seen

@@ -104,6 +104,44 @@ class Api(private val settings: Settings) {
     /** You (everything) and your friends (what they share) */
     suspend fun leaderboard(): List<FriendView> = list("/friends/leaderboard", ::parseFriendView)
 
+    // ---- Achievements, photos, camera reps
+
+    suspend fun achievements(): Achievements = parseAchievements(JSONObject(call("GET", "/achievements")!!))
+
+    /** null: back to the level title */
+    suspend fun wearTitle(key: String?) {
+        call("PUT", "/achievements/title", JSONObject().put("key", key ?: JSONObject.NULL))
+    }
+
+    /** The unlock screen was shown */
+    suspend fun achievementsSeen() {
+        call("POST", "/achievements/seen")
+    }
+
+    /** A set counted by the camera: added to the day's push-ups / squats / sit-ups */
+    suspend fun addReps(date: LocalDate, exercise: String, count: Int) {
+        call("POST", "/daily-logs/$date/reps", JSONObject().put("exercise", exercise).put("count", count))
+    }
+
+    suspend fun uploadPhoto(jpeg: ByteArray): Profile = withContext(Dispatchers.IO) {
+        check(settings.isConfigured) { "Enter the server address and device token in Settings" }
+        val form = MultipartBody.Builder().setType(MultipartBody.FORM)
+            .addFormDataPart("photo", "me.jpg", jpeg.toRequestBody("image/jpeg".toMediaType()))
+            .build()
+        val request = Request.Builder()
+            .url("${settings.serverUrl}/profile/photo")
+            .header("Authorization", "Bearer ${settings.token}")
+            .put(form)
+            .build()
+        client.newCall(request).execute().use { response ->
+            val text = response.body.string()
+            if (!response.isSuccessful) throw ApiException(response.code, errorDetail(text) ?: "Server error ${response.code}")
+            parseProfile(JSONObject(text))
+        }
+    }
+
+    suspend fun deletePhoto(): Profile = parseProfile(JSONObject(call("DELETE", "/profile/photo")!!))
+
     // ---- Dave Ramsey's Baby Steps
 
     suspend fun babySteps(): BabySteps = parseBabySteps(JSONObject(call("GET", "/money/baby-steps")!!))

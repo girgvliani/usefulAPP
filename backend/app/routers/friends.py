@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import get_current_user
 from app.models import Friendship, User, UserProfile
-from app.services import friends, profiles
+from app.services import friends, photos, profiles
 
 router = APIRouter(prefix="/friends", tags=["friends"])
 
@@ -22,11 +22,13 @@ class SharingIn(BaseModel):
     stats: bool | None = None
     streaks: bool | None = None
     goals: bool | None = None
+    achievements: bool | None = None
     leaderboard: bool | None = None  # on the global leaderboard
 
 
 def _person(db: Session, user: User) -> dict:
-    return {"id": user.id, "name": friends.name_of(db, user), "code": friends.friend_code(db, user)}
+    return {"id": user.id, "name": friends.name_of(db, user), "code": friends.friend_code(db, user),
+            "photo_url": photos.public_url(db, user)}
 
 
 @router.get("")

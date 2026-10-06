@@ -80,7 +80,15 @@ fun LifeRpgApp(sharedPhoto: Uri? = null, onSharedPhotoUsed: () -> Unit = {}) {
             snackbar.showSnackbar("+$it XP")
         }
     }
-    levelState.levelUp?.let { LevelUpDialog(it, onDismiss = { levelState.levelUp = null }) }
+    // New achievements first; a level-up waits until they're closed
+    if (levelState.newAchievements.isNotEmpty()) {
+        AchievementUnlockDialog(levelState.newAchievements) {
+            levelState.newAchievements = emptyList()
+            scope.launch { runCatching { api.achievementsSeen() } }
+        }
+    } else {
+        levelState.levelUp?.let { LevelUpDialog(it, onDismiss = { levelState.levelUp = null }) }
+    }
     if (customizing) {
         CustomizeBarDialog(
             pinned,
@@ -93,7 +101,7 @@ fun LifeRpgApp(sharedPhoto: Uri? = null, onSharedPhotoUsed: () -> Unit = {}) {
         )
     }
 
-    CompositionLocalProvider(LocalLevel provides levelState) {
+    CompositionLocalProvider(LocalLevel provides levelState, LocalServerUrl provides settings.serverUrl.trimEnd('/')) {
         ModalNavigationDrawer(
             drawerState = drawer,
             drawerContent = {
@@ -145,6 +153,8 @@ fun LifeRpgApp(sharedPhoto: Uri? = null, onSharedPhotoUsed: () -> Unit = {}) {
                             Dest.Character -> CharacterScreen(api, onOpen = { open(it) })
                             Dest.CheckIn -> CheckInScreen(api)
                             Dest.Meals -> MealsScreen(api, sharedPhoto, onSharedPhotoUsed)
+                            Dest.RepCounter -> RepCounterScreen(api)
+                            Dest.Achievements -> AchievementsScreen(api)
                             Dest.Plan -> PlanScreen(api, onOpen = { open(it) })
                             Dest.Goals -> GoalsScreen(api)
                             Dest.Milestones -> MilestonesScreen(api)

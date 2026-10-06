@@ -67,6 +67,8 @@ object Sync {
             h.activeMinutes?.takeIf { it > 0 }?.let { body.put("active_min", minOf(it, 1440)) }
             h.weightKg?.let { body.put("weight_kg", Math.round(it * 10) / 10.0) }
             h.restingHr?.let { body.put("resting_hr", it) }
+            h.runKm?.let { body.put("run_km", Math.round(it * 100) / 100.0) }
+            h.longestRunKm?.let { body.put("longest_run_km", Math.round(it * 100) / 100.0) }
             if (body.length() > 0) json.put("body", body)
         }
 

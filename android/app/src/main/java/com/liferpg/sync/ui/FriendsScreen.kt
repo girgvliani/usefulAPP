@@ -46,6 +46,7 @@ private val SHARE_SWITCHES = listOf(
     Triple("stats", "Categories and stats", "TOTAL, the 6 categories and 9 stats, and how TOTAL moved this week"),
     Triple("streaks", "Streaks", "Your current and best streaks"),
     Triple("goals", "Goals and progress", "Goal names and how far along you are, never the numbers (like your weight)"),
+    Triple("achievements", "Achievements", "How many badges you've earned and your latest ones"),
 )
 
 /** A column of the leaderboard: its label, the value for a row (null = not shared), and how to show it */
@@ -236,7 +237,8 @@ private fun GlobalRowView(row: GlobalRow) {
             when (row.rank) { null -> "–"; 1 -> "🥇"; 2 -> "🥈"; 3 -> "🥉"; else -> "${row.rank}" },
             Modifier.width(40.dp), fontWeight = FontWeight.Black, color = Rpg.Muted,
         )
-        Column(Modifier.weight(1f)) {
+        Avatar(row.photoUrl, row.name, 34.dp)
+        Column(Modifier.weight(1f).padding(start = 10.dp)) {
             Text(if (row.me) "${row.name} (you)" else row.name, fontWeight = if (row.me) FontWeight.Black else FontWeight.Normal,
                 color = if (row.me) Rpg.Accent else Rpg.Text)
             Text("${row.title} · ${"%,d".format(row.xp)} XP", color = Rpg.Muted, fontSize = 12.sp)
@@ -278,7 +280,8 @@ internal fun Leaderboard(board: Board, rows: List<FriendView>) {
 internal fun FriendCard(friend: FriendView, onRemove: () -> Unit) {
     HudCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
+            Avatar(friend.photoUrl, friend.name, 48.dp, ring = Rpg.Outline)
+            Column(Modifier.weight(1f).padding(start = 12.dp)) {
                 Text(friend.name, fontWeight = FontWeight.Black, fontSize = 18.sp)
                 Text(friend.code, color = Rpg.Muted, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
             }
@@ -309,7 +312,15 @@ internal fun FriendCard(friend: FriendView, onRemove: () -> Unit) {
             }
             Meter((g.progress ?: 0.0).toFloat(), if (g.achieved) Rpg.Good else Rpg.Accent)
         }
-        if (friend.level == null && friend.stats == null && friend.streaks == null && friend.goals == null) {
+        friend.achievements?.let { a ->
+            Text("🏆 ${a.earned} of ${a.total} achievements", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            if (a.badges.isNotEmpty()) {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    a.badges.take(7).forEach { HexBadge(it.icon, it.tier, earned = true, size = 38.dp) }
+                }
+            }
+        }
+        if (friend.level == null && friend.stats == null && friend.streaks == null && friend.goals == null && friend.achievements == null) {
             Text("${friend.name} isn't sharing anything yet.", color = Rpg.Muted, fontSize = 13.sp)
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {

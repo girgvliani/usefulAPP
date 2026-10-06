@@ -23,6 +23,7 @@ object Rpg {
     val Muted = Color(0xFF9C97B8)
     val Good = Color(0xFF4ADE80)
     val Bad = Color(0xFFF87171)
+    val Gold = Color(0xFFFFD166)
 }
 
 /** One color per stat, the same as the terminal app's character sheet. */

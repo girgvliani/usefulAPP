@@ -22,6 +22,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -289,6 +290,7 @@ private fun ProfileForm(api: Api, profile: Profile, income: Income, onSaved: () 
     var earned by remember(income) { mutableStateOf(income.earned.toString()) }
     var message by remember(profile) { mutableStateOf<String?>(null) }
 
+    ProfilePhotoCard(api, profile, onSaved)
     HudCard {
         SectionTitle("Your profile · the formulas are shared, these targets are yours")
         OutlinedTextField(name, { name = it }, label = { Text("Name on your card") }, singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -451,5 +453,46 @@ private fun TipsCard(settings: Settings) {
             Text("Evening", color = Rpg.Muted, fontSize = 12.sp)
             ChoiceChips((17..22).map { it to "%02d:00".format(it) }, evening) { evening = it; save() }
         }
+    }
+}
+
+/** Your photo: chosen from the gallery, cropped to a square on the phone, cleaned up again by the server */
+@Composable
+private fun ProfilePhotoCard(api: Api, profile: Profile, onSaved: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<String?>(null) }
+    val pick = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        busy = true
+        scope.launch {
+            runCatching { api.uploadPhoto(com.liferpg.sync.ProfilePhotos.square(context, uri)) }
+                .onSuccess { message = "✓ New photo"; onSaved() }
+                .onFailure { message = "❌ ${it.message}" }
+            busy = false
+        }
+    }
+    HudCard {
+        SectionTitle("Profile photo")
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Avatar(profile.photoUrl, profile.displayName ?: profile.nickname ?: "?", 72.dp, ring = Rpg.Accent)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Button(enabled = !busy, onClick = {
+                    pick.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }) { Text(if (busy) "Uploading…" else if (profile.photoUrl == null) "Add a photo" else "Change photo") }
+                if (profile.photoUrl != null) {
+                    TextButton(enabled = !busy, onClick = {
+                        scope.launch {
+                            runCatching { api.deletePhoto() }.onSuccess { message = "Photo removed"; onSaved() }.onFailure { message = "❌ ${it.message}" }
+                        }
+                    }) { Text("Remove", color = Rpg.Bad) }
+                }
+            }
+        }
+        Text("Friends and the leaderboard see it wherever they see your name; with “Just your code” it's hidden.", color = Rpg.Muted, fontSize = 12.sp)
+        message?.let { Text(it, color = if (it.startsWith("❌")) Rpg.Bad else Rpg.Good, fontSize = 13.sp) }
     }
 }

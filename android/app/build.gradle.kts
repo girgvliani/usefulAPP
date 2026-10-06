@@ -11,8 +11,10 @@ android {
         applicationId = "com.liferpg.sync"
         minSdk = 29
         targetSdk = 36
-        versionCode = 13
-        versionName = "0.13"
+        versionCode = 14
+        versionName = "0.14"
+        // ML Kit's pose detection ships native code for every CPU; phones like the Galaxy S23 only need arm64
+        ndk { abiFilters += listOf("arm64-v8a") }
     }
 
     buildFeatures {
@@ -44,6 +46,11 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
     implementation("androidx.work:work-runtime-ktx:2.12.0")
     implementation("androidx.health.connect:connect-client:1.1.0")
+    // Rep counter: camera preview + frames, and pose detection on the phone
+    implementation("androidx.camera:camera-camera2:1.5.0")
+    implementation("androidx.camera:camera-lifecycle:1.5.0")
+    implementation("androidx.camera:camera-view:1.5.0")
+    implementation("com.google.mlkit:pose-detection:18.0.0-beta5")
     implementation("com.squareup.okhttp3:okhttp:5.5.0")
     implementation("androidx.glance:glance-appwidget:1.2.0")
 

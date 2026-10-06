@@ -34,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.liferpg.sync.AchievementBrief
 import com.liferpg.sync.Api
 import com.liferpg.sync.Level
 import com.liferpg.sync.Settings
@@ -50,6 +51,8 @@ class LevelState(private val api: Api, private val settings: Settings) {
     var gained by mutableStateOf<Int?>(null)
     /** A level reached since the app last celebrated one */
     var levelUp by mutableStateOf<Level?>(null)
+    /** Achievements earned since the unlock screen was last shown (the server keeps track) */
+    var newAchievements by mutableStateOf<List<AchievementBrief>>(emptyList())
 
     suspend fun refresh() {
         if (!settings.isConfigured) return
@@ -58,6 +61,7 @@ class LevelState(private val api: Api, private val settings: Settings) {
         if (before != null && fresh.xp > before.xp) gained = fresh.xp - before.xp
         if (settings.lastSeenLevel in 0 until fresh.level) levelUp = fresh
         if (settings.lastSeenLevel < 0 || fresh.level > settings.lastSeenLevel) settings.lastSeenLevel = fresh.level
+        if (fresh.newAchievements.isNotEmpty()) newAchievements = fresh.newAchievements
         level = fresh
     }
 }
@@ -152,7 +156,7 @@ fun LevelHero(level: Level) {
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("activity" to "Activity", "quests" to "Quests", "goals" to "Goals").forEach { (key, label) ->
+            listOf("activity" to "Activity", "quests" to "Quests", "goals" to "Goals", "achievements" to "Badges").forEach { (key, label) ->
                 Column(Modifier.weight(1f).background(Rpg.SurfaceHigh, RoundedCornerShape(12.dp)).padding(10.dp)) {
                     Text(label.uppercase(), color = Rpg.Muted, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
                     Text("%,d".format(level.sources[key] ?: 0), fontWeight = FontWeight.Black, fontSize = 16.sp)

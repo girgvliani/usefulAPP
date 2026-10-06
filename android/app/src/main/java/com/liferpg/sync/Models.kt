@@ -65,6 +65,8 @@ data class Profile(
     val sex: String?,
     val nickname: String? = null,
     val publicName: String = "nickname",  // what friends and the leaderboard see: name / nickname / code
+    val photoUrl: String? = null,  // /photos/{token}.jpg on the server
+    val title: String? = null,     // the achievement title you wear
 )
 
 data class MealItem(val name: String, val grams: Double?, val kcal: Double, val protein: Double, val carbs: Double, val fat: Double)
@@ -132,6 +134,7 @@ data class Level(
     val today: List<Pair<String, Int>> = emptyList(),
     val sources: Map<String, Int> = emptyMap(),
     val history: List<Pair<String, Int>> = emptyList(),  // (ISO date, activity XP), oldest first
+    val newAchievements: List<AchievementBrief> = emptyList(),  // earned since the unlock screen was last seen
 ) {
     val progress get() = ((xp - levelStartXp).toFloat() / (nextLevelXp - levelStartXp)).coerceIn(0f, 1f)
     val toNext get() = nextLevelXp - xp
@@ -252,6 +255,8 @@ fun parseProfile(json: JSONObject) = Profile(
     heightCm = json.doubleOrNull("height_cm"),
     birthYear = json.intOrNull("birth_year"),
     sex = json.stringOrNull("sex"),
+    photoUrl = if (json.has("photo_url")) json.stringOrNull("photo_url") else null,
+    title = if (json.has("title")) json.stringOrNull("title") else null,
 )
 
 fun parseMeal(json: JSONObject) = Meal(
@@ -317,6 +322,7 @@ fun parseLevel(json: JSONObject) = Level(
     today = json.optJSONArray("today")?.map { it.getString("reason") to it.getInt("xp") }.orEmpty(),
     sources = json.optJSONObject("sources")?.let { s -> s.keys().asSequence().associateWith { s.getInt(it) } }.orEmpty(),
     history = json.optJSONArray("history")?.map { it.getString("date") to it.getInt("xp") }.orEmpty(),
+    newAchievements = json.optJSONArray("new_achievements")?.map(::parseAchievementBrief).orEmpty(),
 )
 
 fun parseMilestone(json: JSONObject) =
@@ -469,6 +475,8 @@ data class FriendView(
     val stats: FriendStats?,
     val streaks: List<FriendStreak>?,
     val goals: List<FriendGoal>?,
+    val photoUrl: String? = null,
+    val achievements: Showcase? = null,  // null when they don't share it
 )
 
 data class FriendRequest(val requestId: Int, val name: String, val code: String)
@@ -505,6 +513,12 @@ fun parseFriendView(json: JSONObject) = FriendView(
     goals = json.optJSONArray("goals")?.map { g ->
         FriendGoal(g.getString("title"), if (g.isNull("progress")) null else g.getDouble("progress"), g.optBoolean("achieved"))
     },
+    photoUrl = if (json.has("photo_url")) json.stringOrNull("photo_url") else null,
+    achievements = json.optJSONObject("achievements")?.let { a ->
+        Showcase(a.getInt("earned"), a.getInt("total"), a.getJSONArray("badges").map { b ->
+            AchievementBrief(b.getString("key"), "", b.getString("icon"), b.getString("name"), b.getInt("tier"), 0, null)
+        })
+    },
 )
 
 fun parseFriendsOverview(json: JSONObject): FriendsOverview {
@@ -520,13 +534,14 @@ fun parseFriendsOverview(json: JSONObject): FriendsOverview {
 }
 
 /** One player on the global leaderboard: name, level, title and XP only. rank is null when you're hidden. */
-data class GlobalRow(val id: Int, val name: String, val level: Int, val title: String, val xp: Int, val me: Boolean, val rank: Int?)
+data class GlobalRow(val id: Int, val name: String, val level: Int, val title: String, val xp: Int, val me: Boolean, val rank: Int?, val photoUrl: String? = null)
 
 data class GlobalBoard(val players: Int, val top: List<GlobalRow>, val you: GlobalRow)
 
 private fun parseGlobalRow(r: JSONObject) = GlobalRow(
     r.getInt("id"), r.getString("name"), r.getInt("level"), r.getString("title"), r.getInt("xp"), r.optBoolean("me"),
     if (r.isNull("rank")) null else r.getInt("rank"),
+    if (r.has("photo_url") && !r.isNull("photo_url")) r.getString("photo_url") else null,
 )
 
 fun parseGlobalBoard(json: JSONObject) =
@@ -596,4 +611,56 @@ fun parseBabySteps(json: JSONObject) = BabySteps(
         )
     },
     plan = json.getJSONObject("plan"),
+)
+
+// ---- Achievements and stories
+
+data class AchievementBrief(val key: String, val story: String, val icon: String, val name: String, val tier: Int, val xp: Int, val title: String?)
+
+/** One achievement with how to get it and your progress (value of target, in unit) */
+data class AchievementItem(
+    val brief: AchievementBrief,
+    val how: String,
+    val unit: String,
+    val value: Double,
+    val target: Double,
+    val progress: Double,
+    val earnedAt: String?,
+) {
+    val earned get() = earnedAt != null
+}
+
+/** A story: its chapters (achievement keys, in order), how many are done and the next one */
+data class StoryInfo(val key: String, val name: String, val icon: String, val blurb: String, val chapters: List<String>, val done: Int, val next: String?)
+
+data class Achievements(val earned: Int, val total: Int, val xp: Int, val title: String?, val stories: List<StoryInfo>, val items: List<AchievementItem>) {
+    fun item(key: String) = items.firstOrNull { it.brief.key == key }
+}
+
+/** What friends see: how many, and the latest badges */
+data class Showcase(val earned: Int, val total: Int, val badges: List<AchievementBrief>)
+
+fun parseAchievementBrief(j: JSONObject) = AchievementBrief(
+    j.getString("key"), j.optString("story"), j.getString("icon"), j.getString("name"), j.getInt("tier"), j.optInt("xp"),
+    if (j.has("title") && !j.isNull("title")) j.getString("title") else null,
+)
+
+fun parseAchievements(json: JSONObject) = Achievements(
+    earned = json.getInt("earned"),
+    total = json.getInt("total"),
+    xp = json.getInt("xp"),
+    title = if (json.isNull("title")) null else json.getString("title"),
+    stories = json.getJSONArray("stories").map { s ->
+        StoryInfo(
+            s.getString("key"), s.getString("name"), s.getString("icon"), s.getString("blurb"),
+            s.getJSONArray("chapters").let { c -> (0 until c.length()).map { c.getString(it) } },
+            s.getInt("done"), if (s.isNull("next")) null else s.getString("next"),
+        )
+    },
+    items = json.getJSONArray("achievements").map { a ->
+        AchievementItem(
+            parseAchievementBrief(a), a.getString("how"), a.getString("unit"), a.getDouble("value"), a.getDouble("target"),
+            a.getDouble("progress"), if (a.isNull("earned_at")) null else a.getString("earned_at"),
+        )
+    },
 )

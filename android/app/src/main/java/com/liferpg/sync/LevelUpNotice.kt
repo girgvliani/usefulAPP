@@ -20,6 +20,7 @@ object LevelUpNotice {
     suspend fun check(context: Context) {
         val settings = Settings(context)
         val level = Api(settings).level()
+        notifyAchievements(context, settings, level)
         val last = settings.lastNotifiedLevel
         settings.lastNotifiedLevel = maxOf(last, level.level)
         if (last < 0 || level.level <= last) return  // first look just remembers where you are
@@ -38,5 +39,27 @@ object LevelUpNotice {
             .setAutoCancel(true)
             .build()
         NotificationManagerCompat.from(context).notify(ID, notification)
+    }
+
+    /** Earned by a sync (a marathon from Samsung Health, say): one notification for the new ones */
+    private fun notifyAchievements(context: Context, settings: Settings, level: Level) {
+        val fresh = level.newAchievements.filter { it.key !in settings.notifiedAchievements }
+        if (fresh.isEmpty()) return
+        settings.notifiedAchievements = settings.notifiedAchievements + fresh.map { it.key }
+        val allowed = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        if (!allowed) return
+        context.getSystemService(NotificationManager::class.java)
+            .createNotificationChannel(NotificationChannel(CHANNEL, "Level ups", NotificationManager.IMPORTANCE_DEFAULT))
+        val open = PendingIntent.getActivity(context, 1, Intent(context, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
+        val best = fresh.maxBy { it.tier }
+        val notification = NotificationCompat.Builder(context, CHANNEL)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle("🏆 ${if (fresh.size == 1) "Achievement" else "${fresh.size} achievements"}: ${best.icon} ${best.name}")
+            .setContentText("+${fresh.sumOf { it.xp }} XP" + (best.title?.let { " · new title “$it”" } ?: ""))
+            .setContentIntent(open)
+            .setAutoCancel(true)
+            .build()
+        NotificationManagerCompat.from(context).notify(ID + 1, notification)
     }
 }

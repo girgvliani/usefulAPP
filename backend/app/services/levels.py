@@ -2,7 +2,7 @@
 counted twice and past days count too.
 
 XP = quest XP (life areas: todos, projects, milestones, habits) + daily activity XP (below)
-     + GOAL_XP per goal reached.
+     + GOAL_XP per goal reached + each earned achievement's bonus XP.
 Levels get steadily longer: reaching level L takes 50·L·(L+1) XP (L1 100, L2 300, L5 1,500, L10 5,500).
 """
 
@@ -104,7 +104,9 @@ def summary(db: Session, user: User) -> dict:
         if goals.progress(goal.start_value, goal.target_value, goals.current_value(goal, data, today.isoformat())) == 1
     )
 
-    xp = activity + quests + GOAL_XP * reached
+    from app.services import achievements
+    bonus = achievements.xp_earned(db, user)
+    xp = activity + quests + GOAL_XP * reached + bonus
     level = level_for(xp)
     return {
         'level': level,
@@ -115,6 +117,6 @@ def summary(db: Session, user: User) -> dict:
         'next_level_xp': xp_for_level(level + 1),
         'today_xp': sum(value for _, value in today_items),
         'today': [{'reason': reason, 'xp': value} for reason, value in today_items],
-        'sources': {'activity': activity, 'quests': quests, 'goals': GOAL_XP * reached},
+        'sources': {'activity': activity, 'quests': quests, 'goals': GOAL_XP * reached, 'achievements': bonus},
         'history': history,
     }

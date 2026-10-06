@@ -2,6 +2,7 @@ import enum
 from datetime import date, datetime
 
 from sqlalchemy import (
+    LargeBinary,
     Boolean,
     Date,
     DateTime,
@@ -236,6 +237,11 @@ class UserProfile(Base):
     public_name: Mapped[str] = mapped_column(String(10), nullable=False, default="nickname", server_default="nickname")
     # Dave Ramsey's Baby Steps: the numbers the user enters (services/baby_steps.py)
     baby_steps: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict, server_default="{}")
+    # Achievements: the title worn (an achievement key), when the unlock screen was last seen, and
+    # whether friends see your badges
+    title_key: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    achievements_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    share_achievements: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
     # Customization unlocked by level: {"off": {"MP": ["Meditation"]}, ...}
     customization: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict, server_default="{}")
     # Chrome history import: site -> category the user chose ("localhost:3000" -> "work")
@@ -306,3 +312,26 @@ class QuestionnaireAttempt(Base):
     answers: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)  # question id -> answer
     results: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)  # priorities, focus, plan, cohort
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class EarnedAchievement(Base):
+    """An achievement from services/achievements.py, once reached (the older `achievements` table holds
+    the per-skill tier names)"""
+    __tablename__ = "earned_achievements"
+    __table_args__ = (UniqueConstraint("user_id", "key", name="uq_earned_achievement_user_key"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    key: Mapped[str] = mapped_column(String(40), nullable=False)
+    earned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class ProfilePhoto(Base):
+    """A 256 px JPEG, re-encoded on upload (no EXIF, so no location). Served at /photos/{token}.jpg: the
+    random token is the only key, and it changes with every upload."""
+    __tablename__ = "profile_photos"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    token: Mapped[str] = mapped_column(String(40), unique=True, nullable=False)
+    data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

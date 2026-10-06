@@ -8,7 +8,7 @@ from app.database import get_db
 from app.deps import get_current_user
 from app.models import DailyScore, EpicMilestone, Habit, Income, LifeArea, User
 from app.schemas import CategoryResult, CharacterDay, CharacterSheetOut, DailyScoreOut, HabitStatus, LevelOut, StatResult, StatsOut, StreaksOut
-from app.services import character_stats, daily_logs, levels, profiles, rpg_logic, streaks, tips
+from app.services import achievements, character_stats, daily_logs, levels, profiles, rpg_logic, streaks, tips
 
 router = APIRouter(prefix="/stats", tags=["stats"])
 
@@ -115,5 +115,7 @@ def get_streaks(current_user: User = Depends(get_current_user), db: Session = De
 
 @router.get("/level", response_model=LevelOut)
 def get_level(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Global level and XP from every source, plus what today has earned so far."""
-    return levels.summary(db, current_user)
+    """Global level and XP from every source, plus what today has earned so far. Checks achievements
+    first, so anything just reached is in the XP and in new_achievements."""
+    achievements.evaluate(db, current_user)
+    return {**levels.summary(db, current_user), "new_achievements": achievements.unseen(db, current_user)}

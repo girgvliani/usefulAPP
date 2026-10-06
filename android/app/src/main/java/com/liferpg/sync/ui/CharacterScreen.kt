@@ -41,7 +41,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun CharacterScreen(api: Api, onOpen: (Dest) -> Unit = {}) {
     // The name on the card comes from the profile; the sheet still shows if that call fails
-    val sheet = rememberLoader { api.character() to runCatching { api.profile().displayName }.getOrNull() }
+    val sheet = rememberLoader { api.character() to runCatching { api.profile() }.getOrNull() }
     // Until you've taken the questionnaire, the Character screen asks you to (null: couldn't tell)
     val taken = rememberLoader { runCatching { api.attempts().isNotEmpty() }.getOrNull() }
     val tip = rememberLoader { runCatching { api.tip("morning") }.getOrNull() }
@@ -50,14 +50,16 @@ fun CharacterScreen(api: Api, onOpen: (Dest) -> Unit = {}) {
     // Character → category → stat; Back walks the same way
     var openCategory by remember { mutableStateOf<String?>(null) }
     var openStat by remember { mutableStateOf<String?>(null) }
-    LoadView(sheet) { (data, name) ->
+    LoadView(sheet) { (data, profile) ->
         val category = data.categories.firstOrNull { it.key == openCategory }
         val stat = data.stats.firstOrNull { it.code == openStat }
         when {
             stat != null -> StatDetailScreen(api, stat, backLabel = category?.name ?: "Character", onBack = { openStat = null })
             category != null -> CategoryScreen(api, data, category, onBack = { openCategory = null }, onOpenStat = { openStat = it.code })
             else -> CharacterSheetView(
-                data, name, levelState?.level,
+                data, profile?.displayName, levelState?.level,
+                photoUrl = profile?.photoUrl,
+                wornTitle = profile?.title,
                 askQuestionnaire = (taken.value as? Load.Ready)?.value == false,
                 tip = (tip.value as? Load.Ready)?.value,
                 onQuestionnaire = { onOpen(Dest.Questionnaire) },
@@ -82,6 +84,8 @@ internal fun CharacterSheetView(
     askQuestionnaire: Boolean = false,
     onQuestionnaire: () -> Unit = {},
     tip: com.liferpg.sync.Tip? = null,
+    photoUrl: String? = null,
+    wornTitle: String? = null,
     onRefresh: () -> Unit,
 ) {
     Column(
@@ -89,8 +93,10 @@ internal fun CharacterSheetView(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
+            Avatar(photoUrl, name ?: "?", 56.dp, ring = Rpg.Accent)
+            Column(Modifier.weight(1f).padding(start = 12.dp)) {
                 Text("“${(name ?: "Your character").uppercase()}”", style = MaterialTheme.typography.headlineLarge, color = Rpg.Accent)
+                wornTitle?.let { Text("🏆 $it", color = Rpg.Gold, fontWeight = FontWeight.Black, fontSize = 14.sp) }
                 Text(sheet.date, color = Rpg.Muted, fontSize = 13.sp)
             }
             TextButton(onClick = onRefresh) { Text("↻ Refresh") }

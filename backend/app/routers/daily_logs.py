@@ -2,6 +2,7 @@ from datetime import date
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -65,6 +66,27 @@ def save_log(
     """Merge fields into a day. Devices send source=auto; check-ins use manual, which wins per field."""
     _check_not_future(db, current_user, day)
     return _to_schema(daily_logs.save(db, current_user, day, source, _updates(payload)))
+
+
+class RepsIn(BaseModel):
+    exercise: Literal["pushups", "squats", "situps"]
+    count: int = Field(ge=1, le=1000)
+
+
+@router.post("/{day}/reps", response_model=DailyLogOut)
+def add_reps(day: date, payload: RepsIn, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """A set counted by the camera: adds to the day's push-ups / squats / sit-ups (the check-in fields),
+    keeps the camera's own count, and raises the best set when this one beats it."""
+    _check_not_future(db, current_user, day)
+    log = daily_logs.get_log(db, current_user, day)
+    merged = daily_logs.merged(log).get("body", {}) if log else {}
+    body = {payload.exercise: (merged.get(payload.exercise) or 0) + payload.count,
+            f"cam_{payload.exercise}": (merged.get(f"cam_{payload.exercise}") or 0) + payload.count}
+    if payload.exercise == "pushups":
+        body["cam_best_set"] = max(merged.get("cam_best_set") or 0, payload.count)
+        if payload.count > (merged.get("max_pushups") or 0):
+            body["max_pushups"] = payload.count
+    return _to_schema(daily_logs.save(db, current_user, day, "manual", {"body": body}))
 
 
 @router.post("/batch", response_model=list[DailyLogOut])

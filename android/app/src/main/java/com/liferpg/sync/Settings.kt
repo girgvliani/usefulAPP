@@ -31,6 +31,11 @@ class Settings(context: Context) {
         get() = prefs.getInt("last_seen_level", -1)
         set(value) = prefs.edit { putInt("last_seen_level", value) }
 
+    /** Achievements already announced by a notification */
+    var notifiedAchievements: Set<String>
+        get() = prefs.getStringSet("notified_achievements", emptySet()).orEmpty()
+        set(value) = prefs.edit { putStringSet("notified_achievements", value) }
+
     var lastNotifiedLevel: Int
         get() = prefs.getInt("last_notified_level", -1)
         set(value) = prefs.edit { putInt("last_notified_level", value) }

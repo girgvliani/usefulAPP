@@ -5,7 +5,8 @@ Nothing is shared until its switch is on, and the switches apply to all friends 
 - stats: TOTAL, the six categories and nine stats (scores and ranks), and how TOTAL moved this week
 - streaks: current and best streaks
 - goals: goal titles and progress (never the numbers behind them, like a weight)
-A friend sees your display name (or your code), never your email.
+- achievements: how many you've earned and your latest badges
+A friend sees your name as you chose it (and your photo with it), never your email.
 """
 
 import secrets
@@ -15,10 +16,10 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.models import Friendship, Goal, GoalType, User, UserProfile
-from app.services import character_stats, daily_logs, goals, levels, profiles, streaks
+from app.services import achievements, character_stats, daily_logs, goals, levels, photos, profiles, streaks
 
 CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0/O or 1/I to misread
-SHARES = ("level", "stats", "streaks", "goals")
+SHARES = ("level", "stats", "streaks", "goals", "achievements")
 
 
 def friend_code(db: Session, user: User) -> str:
@@ -55,7 +56,8 @@ def global_board(db: Session, me: User) -> dict:
     rows = []
     for user in users:
         summary = levels.summary(db, user)
-        rows.append({"id": user.id, "name": name_of(db, user), "level": summary["level"], "title": summary["title"],
+        rows.append({"id": user.id, "name": name_of(db, user), "photo_url": photos.public_url(db, user),
+                     "level": summary["level"], "title": achievements.worn_title(db, user) or summary["title"],
                      "xp": summary["xp"], "me": user.id == me.id})
     rows.sort(key=lambda r: (-r["xp"], r["name"]))
     for i, row in enumerate(rows):
@@ -63,8 +65,8 @@ def global_board(db: Session, me: User) -> dict:
     mine = next((r for r in rows if r["me"]), None)
     if mine is None:  # hidden: show you where you'd be, without a rank
         summary = levels.summary(db, me)
-        mine = {"id": me.id, "name": name_of(db, me), "level": summary["level"], "title": summary["title"],
-                "xp": summary["xp"], "me": True, "rank": None}
+        mine = {"id": me.id, "name": name_of(db, me), "photo_url": photos.public_url(db, me), "level": summary["level"],
+                "title": achievements.worn_title(db, me) or summary["title"], "xp": summary["xp"], "me": True, "rank": None}
     return {"players": len(rows), "top": rows[:GLOBAL_TOP], "you": mine}
 
 
@@ -120,13 +122,14 @@ def shared(db: Session, user: User, everything: bool = False, parts: tuple = SHA
     parts: which of them to work out at all."""
     allowed = {key: True for key in SHARES} if everything else sharing(db, user)
     on = {key: allowed[key] and key in parts for key in SHARES}
-    view = {"id": user.id, "name": name_of(db, user), "code": friend_code(db, user), "shares": allowed}
+    view = {"id": user.id, "name": name_of(db, user), "code": friend_code(db, user), "shares": allowed,
+            "photo_url": photos.public_url(db, user)}
     today = profiles.today(db, user)
 
     if on["level"]:
         summary = levels.summary(db, user)
         view["level"] = {
-            "level": summary["level"], "title": summary["title"], "xp": summary["xp"],
+            "level": summary["level"], "title": achievements.worn_title(db, user) or summary["title"], "xp": summary["xp"],
             # Activity XP of the last 7 days (quest XP has no dates)
             "week_xp": sum(day["xp"] for day in summary["history"][-7:]),
         }
@@ -151,6 +154,8 @@ def shared(db: Session, user: User, everything: bool = False, parts: tuple = SHA
             {"key": s["key"], "name": s["name"], "emoji": s["emoji"], "current": s["current"], "best": s["best"]}
             for s in streaks.streaks(db, user)["streaks"]
         ]
+    if on["achievements"]:
+        view["achievements"] = achievements.showcase(db, user)
     if on["goals"]:
         data = daily_logs.stats_input(db, user, today)
         rows = db.scalars(select(Goal).where(Goal.user_id == user.id).order_by(Goal.created_at))
