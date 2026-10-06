@@ -32,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.liferpg.sync.Api
 import com.liferpg.sync.FriendView
+import com.liferpg.sync.GlobalBoard
+import com.liferpg.sync.GlobalRow
 import com.liferpg.sync.FriendsOverview
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -66,19 +68,21 @@ fun FriendsScreen(api: Api) {
         coroutineScope {
             val overview = async { api.friends() }
             val board = async { api.leaderboard() }
-            overview.await() to board.await()
+            val everyone = async { runCatching { api.globalBoard() }.getOrNull() }
+            Triple(overview.await(), board.await(), everyone.await())
         }
     }
-    LoadView(data) { (overview, board) -> FriendsContent(api, overview, board, onChanged = data::reload) }
+    LoadView(data) { (overview, board, everyone) -> FriendsContent(api, overview, board, everyone, onChanged = data::reload) }
 }
 
 @Composable
-internal fun FriendsContent(api: Api?, overview: FriendsOverview, board: List<FriendView>, onChanged: () -> Unit) {
+internal fun FriendsContent(api: Api?, overview: FriendsOverview, board: List<FriendView>, everyone: GlobalBoard?, onChanged: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var who by remember { mutableStateOf("") }
     var message by remember { mutableStateOf<String?>(null) }
     var boardKey by remember { mutableStateOf("level") }
+    var showEveryone by remember { mutableStateOf(true) }  // the leaderboard opens on everyone
     var confirmRemove by remember { mutableStateOf<FriendView?>(null) }
     // Switches flip at once; if saving fails they flip back and say why
     val sharing = remember(overview.sharing) { mutableStateMapOf(*overview.sharing.toList().toTypedArray()) }
@@ -94,6 +98,15 @@ internal fun FriendsContent(api: Api?, overview: FriendsOverview, board: List<Fr
     Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("FRIENDS", style = MaterialTheme.typography.headlineLarge, color = Rpg.Accent)
         Text("Compare with friends you choose. They only see what you switch on below.", color = Rpg.Muted, fontSize = 13.sp)
+
+        SectionTitle("Leaderboard")
+        ChoiceChips(listOf(true to "🌍 Everyone", false to "👥 Friends"), showEveryone) { showEveryone = it }
+        if (showEveryone && everyone != null) {
+            GlobalLeaderboard(everyone)
+        } else {
+            ChoiceChips(BOARDS.map { it.key to it.label }, boardKey) { boardKey = it }
+            Leaderboard(BOARDS.first { it.key == boardKey }, board)
+        }
 
         HudCard {
             SectionTitle("Your friend code")
@@ -166,11 +179,26 @@ internal fun FriendsContent(api: Api?, overview: FriendsOverview, board: List<Fr
                 }
             }
             Text("All off = friends see only your name.", color = Rpg.Muted, fontSize = 12.sp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Show me on the global leaderboard", fontWeight = FontWeight.Bold)
+                    Text("Everyone can see your name, level, title and XP there", color = Rpg.Muted, fontSize = 12.sp)
+                }
+                Switch(
+                    checked = sharing["leaderboard"] == true,
+                    onCheckedChange = { on ->
+                        sharing["leaderboard"] = on
+                        act {
+                            runCatching { api?.updateSharing(JSONObject().put("leaderboard", on)) }
+                                .onFailure { sharing["leaderboard"] = !on; throw it }
+                            null
+                        }
+                    },
+                    colors = SwitchDefaults.colors(checkedTrackColor = Rpg.Accent),
+                )
+            }
         }
 
-        SectionTitle("Leaderboard")
-        ChoiceChips(BOARDS.map { it.key to it.label }, boardKey) { boardKey = it }
-        Leaderboard(BOARDS.first { it.key == boardKey }, board)
 
         if (overview.friends.isEmpty()) {
             HudCard { Text("No friends yet. Share your code, or add theirs above.", color = Rpg.Muted) }
@@ -184,6 +212,36 @@ internal fun FriendsContent(api: Api?, overview: FriendsOverview, board: List<Fr
             onConfirm = { confirmRemove = null; act { api?.removeFriend(friend.id); "Unfriended ${friend.name}" } },
             onDismiss = { confirmRemove = null },
         )
+    }
+}
+
+/** Everyone by XP: the top players, then your own place if you're further down (or hidden) */
+@Composable
+internal fun GlobalLeaderboard(board: GlobalBoard) {
+    HudCard {
+        Text("${board.players} ${if (board.players == 1) "player" else "players"} by level", color = Rpg.Muted, fontSize = 12.sp)
+        board.top.forEach { GlobalRowView(it) }
+        if (board.top.none { it.me }) {
+            Text("…", color = Rpg.Muted)
+            GlobalRowView(board.you)
+            if (board.you.rank == null) Text("You're hidden from everyone else; turn it on below to take your place.", color = Rpg.Muted, fontSize = 12.sp)
+        }
+    }
+}
+
+@Composable
+private fun GlobalRowView(row: GlobalRow) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            when (row.rank) { null -> "–"; 1 -> "🥇"; 2 -> "🥈"; 3 -> "🥉"; else -> "${row.rank}" },
+            Modifier.width(40.dp), fontWeight = FontWeight.Black, color = Rpg.Muted,
+        )
+        Column(Modifier.weight(1f)) {
+            Text(if (row.me) "${row.name} (you)" else row.name, fontWeight = if (row.me) FontWeight.Black else FontWeight.Normal,
+                color = if (row.me) Rpg.Accent else Rpg.Text)
+            Text("${row.title} · ${"%,d".format(row.xp)} XP", color = Rpg.Muted, fontSize = 12.sp)
+        }
+        Text("LV ${row.level}", fontWeight = FontWeight.Black)
     }
 }
 

@@ -98,6 +98,9 @@ class Api(private val settings: Settings) {
         call("DELETE", "/friends/$userId")
     }
 
+    /** Everyone by level and XP: the top 50 and your own place */
+    suspend fun globalBoard(): GlobalBoard = parseGlobalBoard(JSONObject(call("GET", "/friends/global")!!))
+
     /** You (everything) and your friends (what they share) */
     suspend fun leaderboard(): List<FriendView> = list("/friends/leaderboard", ::parseFriendView)
 

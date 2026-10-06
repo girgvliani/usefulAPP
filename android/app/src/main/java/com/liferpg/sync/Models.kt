@@ -514,3 +514,16 @@ fun parseFriendsOverview(json: JSONObject): FriendsOverview {
         outgoing = requests("outgoing"),
     )
 }
+
+/** One player on the global leaderboard: name, level, title and XP only. rank is null when you're hidden. */
+data class GlobalRow(val id: Int, val name: String, val level: Int, val title: String, val xp: Int, val me: Boolean, val rank: Int?)
+
+data class GlobalBoard(val players: Int, val top: List<GlobalRow>, val you: GlobalRow)
+
+private fun parseGlobalRow(r: JSONObject) = GlobalRow(
+    r.getInt("id"), r.getString("name"), r.getInt("level"), r.getString("title"), r.getInt("xp"), r.optBoolean("me"),
+    if (r.isNull("rank")) null else r.getInt("rank"),
+)
+
+fun parseGlobalBoard(json: JSONObject) =
+    GlobalBoard(json.getInt("players"), json.getJSONArray("top").map(::parseGlobalRow), parseGlobalRow(json.getJSONObject("you")))

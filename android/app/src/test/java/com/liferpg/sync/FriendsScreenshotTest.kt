@@ -24,7 +24,7 @@ import org.robolectric.annotation.GraphicsMode
 class FriendsScreenshotTest {
 
     @Test
-    fun friends() = capture("friends") { FriendsContent(null, OVERVIEW, BOARD, onChanged = {}) }
+    fun friends() = capture("friends") { FriendsContent(null, OVERVIEW, BOARD, EVERYONE, onChanged = {}) }
 
     @Test
     fun leaderboardSortsAndHides() {
@@ -56,9 +56,19 @@ class FriendsScreenshotTest {
         val CAT = FriendView(3, "Cat", "CAT2-PQ9Z", me = false, FriendLevel(4, "Novice", 1200, 610), null, null, null)
 
         val BOARD = listOf(NICK, BEN, CAT)
+        // Nick is 63rd of 64: the top rows, then "…" and his own place
+        val EVERYONE = GlobalBoard(
+            64,
+            listOf(
+                GlobalRow(7, "Lasha", 21, "Elite", 23_400, false, 1),
+                GlobalRow(2, "Ben", 9, "Apprentice", 4980, false, 2),
+                GlobalRow(8, "Player QX7M-22LA", 8, "Apprentice", 3700, false, 3),
+            ),
+            GlobalRow(1, "Nick", 7, "Apprentice", 3437, true, 63),
+        )
         val OVERVIEW = FriendsOverview(
             code = "K7QF-M2XA",
-            sharing = mapOf("level" to true, "stats" to true, "streaks" to false, "goals" to false),
+            sharing = mapOf("level" to true, "stats" to true, "streaks" to false, "goals" to false, "leaderboard" to true),
             friends = listOf(BEN, CAT),
             incoming = listOf(FriendRequest(9, "Dan", "D4NN-11ZZ")),
             outgoing = emptyList(),
