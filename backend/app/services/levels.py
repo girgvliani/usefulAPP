@@ -21,7 +21,7 @@ LEVEL_STEP = 50
 HISTORY_DAYS = 30
 # (from level, title): a new title every few levels
 TITLES = [(0, "Novice"), (5, "Apprentice"), (10, "Adept"), (15, "Veteran"), (20, "Elite"), (30, "Master"),
-          (40, "Grandmaster"), (50, "Legend")]
+          (40, "Grandmaster"), (50, "Legend"), (1000, "Genius")]
 
 
 def title_for(level: int) -> str:

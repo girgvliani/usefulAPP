@@ -8,7 +8,7 @@ from app.database import get_db
 from app.deps import get_current_user
 from app.models import DailyScore, EpicMilestone, Habit, Income, LifeArea, User
 from app.schemas import CategoryResult, CharacterDay, CharacterSheetOut, DailyScoreOut, HabitStatus, LevelOut, StatResult, StatsOut, StreaksOut
-from app.services import character_stats, daily_logs, levels, profiles, rpg_logic, streaks
+from app.services import character_stats, daily_logs, levels, profiles, rpg_logic, streaks, tips
 
 router = APIRouter(prefix="/stats", tags=["stats"])
 
@@ -46,9 +46,10 @@ def finalize_daily_summary(current_user: User = Depends(get_current_user), db: S
 
 
 def _sheet(db: Session, user: User, data: dict, day: date) -> dict:
-    """Shared formulas, personal targets."""
+    """Shared formulas, personal targets, and the user's own customization (their view only)."""
     profile = profiles.get_profile(db, user)
-    return character_stats.character_sheet(data, day.isoformat(), profile.pushup_target, profile.sleep_target)
+    return character_stats.character_sheet(data, day.isoformat(), profile.pushup_target, profile.sleep_target,
+                                           profile.customization)
 
 
 @router.get("/character", response_model=CharacterSheetOut)
@@ -94,6 +95,16 @@ def character_history(
             categories=sheet['categories'],
         ))
     return history
+
+
+@router.get("/tip")
+def daily_tip(when: str = "morning", current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """The daily tip: morning = the biggest gain available today, evening = what's still open before midnight."""
+    if when == "evening":
+        return {"when": "evening", **tips.evening(db, current_user)}
+    day = profiles.today(db, current_user)
+    sheet = _sheet(db, current_user, daily_logs.stats_input(db, current_user, day), day)
+    return {"when": "morning", **tips.morning(db, current_user, sheet)}
 
 
 @router.get("/streaks", response_model=StreaksOut)

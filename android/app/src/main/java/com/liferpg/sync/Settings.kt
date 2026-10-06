@@ -60,6 +60,19 @@ class Settings(context: Context) {
         get() = prefs.getString("pinned_tabs", null)?.split(',')?.filter { it.isNotEmpty() }
         set(value) = prefs.edit { if (value == null) remove("pinned_tabs") else putString("pinned_tabs", value.joinToString(",")) }
 
+    /** Daily tip notifications, morning and evening */
+    var tipsOn: Boolean
+        get() = prefs.getBoolean("tips_on", true)
+        set(value) = prefs.edit { putBoolean("tips_on", value) }
+
+    var morningTipHour: Int
+        get() = prefs.getInt("morning_tip_hour", 9)
+        set(value) = prefs.edit { putInt("morning_tip_hour", value) }
+
+    var eveningTipHour: Int
+        get() = prefs.getInt("evening_tip_hour", 18)
+        set(value) = prefs.edit { putInt("evening_tip_hour", value) }
+
     companion object {
         const val DEFAULT_SERVER = "https://api-production-0c5a.up.railway.app"
     }

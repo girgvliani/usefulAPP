@@ -371,6 +371,7 @@ class StatResult(BaseModel):
     best_move: BestMove | None
     components: list[StatComponent]
     penalties: list[StatPenalty]
+    off: list[str] = []  # parts the user turned off (customization)
 
 
 class CategoryResult(BaseModel):

@@ -104,6 +104,19 @@ class Api(private val settings: Settings) {
     /** You (everything) and your friends (what they share) */
     suspend fun leaderboard(): List<FriendView> = list("/friends/leaderboard", ::parseFriendView)
 
+    // ---- Customization and tips
+
+    suspend fun customization(): Customization = parseCustomization(JSONObject(call("GET", "/customize")!!))
+
+    /** Turn a part of a stat off or back on (unlocks at LV 7) */
+    suspend fun setPartOff(stat: String, part: String, off: Boolean): Customization =
+        parseCustomization(JSONObject(call("PUT", "/customize/off", JSONObject().put("stat", stat).put("part", part).put("off", off))!!))
+
+    suspend fun resetCustomization(): Customization = parseCustomization(JSONObject(call("DELETE", "/customize")!!))
+
+    /** "morning": the biggest gain today; "evening": what's still open before midnight */
+    suspend fun tip(whenOfDay: String): Tip = parseTip(JSONObject(call("GET", "/stats/tip?when=$whenOfDay")!!))
+
     /** Drop one check-in value so the phone's value shows through again */
     suspend fun clearManual(date: LocalDate, section: String, field: String) {
         call("DELETE", "/daily-logs/$date?source=manual&section=$section&field=$field")

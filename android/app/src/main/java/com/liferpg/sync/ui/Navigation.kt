@@ -41,6 +41,7 @@ enum class Dest(val label: String, val short: String, val icon: String, val grou
     Skills("Skills", "Skills", "🌳", "Plan", "The life areas your XP levels up"),
     Friends("Friends", "Friends", "👥", "You", "Compare with friends you choose"),
     Questionnaire("Questionnaire", "Quiz", "🧭", "You", "What matters to you, and your plan"),
+    Customize("Customize", "Customize", "🎛️", "You", "Shape your stats; new options every level milestone"),
     About("About you", "About", "🪪", "You", "Everything your stats are built from"),
     Profile("Profile & targets", "Profile", "🧍", "You", "Daily targets, body, income goal"),
     Settings("Settings", "Settings", "⚙️", "You", "Account, phone data, sync, Goggins"),

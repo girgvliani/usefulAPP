@@ -460,7 +460,23 @@ def wealth(data):
     ])
 
 
-def character_sheet(data, day, pushup_requirement=100, sleep_need=SLEEP_NEED):
+def customize(sheet, custom):
+    """Applies a user's customization to their stats: parts they've turned off leave the average (the
+    stat is judged on the rest; drains still count). The standard scores used for comparisons skip this."""
+    for code, names in (custom or {}).get('off', {}).items():
+        result = sheet.get(code)
+        if not result or not names:
+            continue
+        kept = [c for c in result['components'] if c['name'] not in names]
+        if not kept or len(kept) == len(result['components']):
+            continue
+        new = combine(kept, result['penalties'], result['ceiling'] or 100, result['ceiling_note'])
+        new['off'] = [c['name'] for c in result['components'] if c['name'] in names]
+        sheet[code] = new
+    return sheet
+
+
+def character_sheet(data, day, pushup_requirement=100, sleep_need=SLEEP_NEED, custom=None):
     """All stats for one day, their six categories, and an overall score averaged over the categories that have data"""
     logs = data.get('daily_logs', {})
     sheet = {
@@ -474,6 +490,7 @@ def character_sheet(data, day, pushup_requirement=100, sleep_need=SLEEP_NEED):
         'SOC': social(data, day),
         'WLT': wealth(data),
     }
+    customize(sheet, custom)
     categories = category_scores({code: stat['score'] for code, stat in sheet.items()})
     scores = [score for score in categories.values() if score is not None]
     return {'stats': sheet, 'categories': categories, 'overall': round(mean(scores)) if scores else None}

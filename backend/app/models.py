@@ -231,6 +231,8 @@ class UserProfile(Base):
     share_stats: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
     share_streaks: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
     share_goals: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
+    # Customization unlocked by level: {"off": {"MP": ["Meditation"]}, ...}
+    customization: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict, server_default="{}")
     # Chrome history import: site -> category the user chose ("localhost:3000" -> "work")
     site_groups: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict, server_default="{}")
     # The global leaderboard (name, level, title, XP): everyone is on it unless they hide

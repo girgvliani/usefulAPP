@@ -44,6 +44,7 @@ fun CharacterScreen(api: Api, onOpen: (Dest) -> Unit = {}) {
     val sheet = rememberLoader { api.character() to runCatching { api.profile().displayName }.getOrNull() }
     // Until you've taken the questionnaire, the Character screen asks you to (null: couldn't tell)
     val taken = rememberLoader { runCatching { api.attempts().isNotEmpty() }.getOrNull() }
+    val tip = rememberLoader { runCatching { api.tip("morning") }.getOrNull() }
     val levelState = LocalLevel.current
     val scope = rememberCoroutineScope()
     // Character → category → stat; Back walks the same way
@@ -58,6 +59,7 @@ fun CharacterScreen(api: Api, onOpen: (Dest) -> Unit = {}) {
             else -> CharacterSheetView(
                 data, name, levelState?.level,
                 askQuestionnaire = (taken.value as? Load.Ready)?.value == false,
+                tip = (tip.value as? Load.Ready)?.value,
                 onQuestionnaire = { onOpen(Dest.Questionnaire) },
                 onOpen = { openStat = it.code },
                 onOpenCategory = { openCategory = it.key },
@@ -79,6 +81,7 @@ internal fun CharacterSheetView(
     onOpenCategory: (Category) -> Unit = {},
     askQuestionnaire: Boolean = false,
     onQuestionnaire: () -> Unit = {},
+    tip: com.liferpg.sync.Tip? = null,
     onRefresh: () -> Unit,
 ) {
     Column(
@@ -98,6 +101,14 @@ internal fun CharacterSheetView(
                 Text("🧭 Take the questionnaire", fontWeight = FontWeight.Black, fontSize = 17.sp)
                 Text("5 minutes on what matters to you and how you live now, for a plan of what to change first.", color = Rpg.Muted, fontSize = 13.sp)
                 Text("Start ›", color = Rpg.Accent, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        tip?.let {
+            HudCard {
+                SectionTitle("Today's tip")
+                Text(it.title, fontWeight = FontWeight.Black, fontSize = 16.sp)
+                Text(it.detail, color = Rpg.Muted, fontSize = 13.sp)
             }
         }
 

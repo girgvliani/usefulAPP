@@ -51,6 +51,7 @@ import com.liferpg.sync.Profile
 import com.liferpg.sync.Settings
 import com.liferpg.sync.Sync
 import com.liferpg.sync.SyncWorker
+import com.liferpg.sync.TipWorker
 import com.liferpg.sync.UsageReader
 import kotlinx.coroutines.launch
 import org.json.JSONObject
@@ -62,6 +63,7 @@ fun SettingsScreen(settings: Settings, api: Api, onConnected: () -> Unit) {
         ConnectionCard(settings, api, onConnected)
         PermissionsCard()
         if (settings.isConfigured) GogginsCard(settings)
+        if (settings.isConfigured) TipsCard(settings)
         SyncCard(settings)
         if (settings.isConfigured) Text("Your targets, body and income goal are in ☰ → Profile & targets.", color = Rpg.Muted, fontSize = 13.sp)
     }
@@ -413,3 +415,34 @@ private fun GogginsCard(settings: Settings) {
 /** Before Android 13 notifications need no permission */
 private fun canNotify(context: Context) = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
     ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+
+/** Morning and evening tip notifications, at the hours you pick */
+@Composable
+private fun TipsCard(settings: Settings) {
+    val context = LocalContext.current
+    var on by remember { mutableStateOf(settings.tipsOn) }
+    var morning by remember { mutableStateOf(settings.morningTipHour) }
+    var evening by remember { mutableStateOf(settings.eveningTipHour) }
+    fun save() {
+        settings.tipsOn = on
+        settings.morningTipHour = morning
+        settings.eveningTipHour = evening
+        TipWorker.schedule(context, reset = true)
+    }
+    HudCard {
+        SectionTitle("💡 Daily tips")
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Morning and evening tips", fontWeight = FontWeight.Bold)
+                Text("Morning: the one thing that raises your scores most today. Evening: what's still open before midnight.", color = Rpg.Muted, fontSize = 12.sp)
+            }
+            Switch(checked = on, onCheckedChange = { on = it; save() })
+        }
+        if (on) {
+            Text("Morning", color = Rpg.Muted, fontSize = 12.sp)
+            ChoiceChips((6..11).map { it to "%02d:00".format(it) }, morning) { morning = it; save() }
+            Text("Evening", color = Rpg.Muted, fontSize = 12.sp)
+            ChoiceChips((17..22).map { it to "%02d:00".format(it) }, evening) { evening = it; save() }
+        }
+    }
+}

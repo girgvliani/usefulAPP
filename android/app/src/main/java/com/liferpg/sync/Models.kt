@@ -527,3 +527,38 @@ private fun parseGlobalRow(r: JSONObject) = GlobalRow(
 
 fun parseGlobalBoard(json: JSONObject) =
     GlobalBoard(json.getInt("players"), json.getJSONArray("top").map(::parseGlobalRow), parseGlobalRow(json.getJSONObject("you")))
+
+// ---- Customization (earned by level) and daily tips
+
+data class Unlock(val level: Int, val key: String, val title: String, val description: String, val unlocked: Boolean, val ready: Boolean)
+
+/** A stat's parts with their standard weights */
+data class StatParts(val code: String, val name: String, val parts: List<Pair<String, Double>>)
+
+data class Customization(
+    val level: Int,
+    val ladder: List<Unlock>,
+    val next: Unlock?,
+    val off: Map<String, List<String>>,  // stat code -> parts turned off
+    val stats: List<StatParts>,
+)
+
+data class Tip(val whenOfDay: String, val title: String, val detail: String)
+
+private fun parseUnlock(u: JSONObject) =
+    Unlock(u.getInt("level"), u.getString("key"), u.getString("title"), u.getString("description"), u.getBoolean("unlocked"), u.getBoolean("ready"))
+
+fun parseCustomization(json: JSONObject): Customization {
+    val off = json.getJSONObject("off")
+    return Customization(
+        level = json.getInt("level"),
+        ladder = json.getJSONArray("ladder").map(::parseUnlock),
+        next = json.optJSONObject("next")?.let(::parseUnlock),
+        off = off.keys().asSequence().associateWith { code -> off.getJSONArray(code).let { a -> (0 until a.length()).map(a::getString) } },
+        stats = json.getJSONArray("stats").map { s ->
+            StatParts(s.getString("code"), s.getString("name"), s.getJSONArray("parts").map { it.getString("name") to it.getDouble("weight") })
+        },
+    )
+}
+
+fun parseTip(json: JSONObject) = Tip(json.getString("when"), json.getString("title"), json.getString("detail"))

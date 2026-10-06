@@ -20,6 +20,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        TipWorker.schedule(this)
         enableEdgeToEdge()
         GogginsMode.apply(this)
         lifecycleScope.launch { runCatching { WidgetCache.refresh(this@MainActivity) } }
