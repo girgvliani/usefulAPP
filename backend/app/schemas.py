@@ -300,6 +300,20 @@ class SocialLog(LogSection):
     interactions: int | None = Field(default=None, ge=0, le=100)
 
 
+class BrowserLog(LogSection):
+    """Estimated minutes per category from an imported Chrome history (time until the next visit, at most 10 min)"""
+    work_min: int | None = minutes()
+    learning_min: int | None = minutes()
+    social_min: int | None = minutes()
+    entertainment_min: int | None = minutes()
+    shopping_min: int | None = minutes()
+    news_min: int | None = minutes()
+    other_min: int | None = minutes()
+    visits: int | None = Field(default=None, ge=0, le=100_000)
+    searches: int | None = Field(default=None, ge=0, le=100_000)
+    shorts: int | None = Field(default=None, ge=0, le=100_000)  # YouTube Shorts opened in the browser
+
+
 class DailyLogIn(LogSection):
     sleep: SleepLog | None = None
     work: WorkLog | None = None
@@ -307,6 +321,7 @@ class DailyLogIn(LogSection):
     screen: ScreenLog | None = None
     body: BodyLog | None = None
     social: SocialLog | None = None
+    browser: BrowserLog | None = None
 
 
 class DailyLogBatchItem(DailyLogIn):

@@ -277,7 +277,7 @@ private fun FieldRow(field: LogField, entry: DayLog, names: Map<String, String>,
                 when {
                     typed != null && phone != null && typed != phone -> "✍ you · 📱 phone said ${show(field, phone)}"
                     typed != null -> "✍ you"
-                    phone != null -> "📱 phone"
+                    phone != null -> if (field.source == "import") "💻 imported" else "📱 phone"
                     else -> "not logged"
                 },
                 Modifier.weight(1f), color = Rpg.Muted, fontSize = 11.sp,
