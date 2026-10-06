@@ -264,3 +264,15 @@ class Meal(Base):
     source: Mapped[str] = mapped_column(String(12), nullable=False)  # photo / manual
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)  # the AI's own 0-1 estimate
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class QuestionnaireAttempt(Base):
+    """One run through the questionnaire. Every attempt is kept; the newest one counts.
+    `results` holds what the server worked out from the answers, including the hidden peer group."""
+    __tablename__ = "questionnaire_attempts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    answers: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)  # question id -> answer
+    results: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)  # priorities, focus, plan, cohort
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

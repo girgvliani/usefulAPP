@@ -233,6 +233,8 @@ The backend in `backend/` stores daily logs and serves the same character sheet:
 | `POST /daily-logs/batch?source=` `{"days": [{"date": …, "sleep": …}]}` | device or login | Up to 31 days in one request (catching up after being offline) |
 | `DELETE /daily-logs/{day}?source=&section=&field=` | device or login | Whole day, one source, one section or one field; e.g. `?source=manual&section=sleep&field=hours` drops a correction |
 | `GET /daily-logs?start=&end=` · `GET /daily-logs/{day}` | device or login | Raw `auto`, `manual` and `merged` data |
+| `GET /questionnaire` · `POST /questionnaire` | device or login | The questions (rendered by both apps), answers to start from, and the latest results; posting saves an attempt and returns priorities, focus areas and a plan. Birth year, sex and height go into the profile, weight into today's log |
+| `GET /questionnaire/attempts` · `/attempts/{id}` | device or login | Every attempt, newest first (all are kept) |
 | `GET /daily-logs/fields` | none | Every value a day can hold: label, unit, kind, usual source (phone / check-in) and the stats that read it |
 | `GET /stats/character?day=` | device or login | The six categories and all nine stats with breakdowns; TOTAL = average of the categories |
 | `GET /stats/character/history?start=&end=` | device or login | Stat and category scores per day (up to 92 days), for charts |

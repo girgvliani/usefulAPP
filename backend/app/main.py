@@ -9,8 +9,8 @@ from slowapi.middleware import SlowAPIMiddleware
 from app.config import settings
 from app.rate_limit import limiter
 from app.routers import (
-    auth, daily_logs, devices, goals, habits, income, life_areas, meals, milestones, profile, projects, screen_time, sleep,
-    social, stats, todos, xp,
+    auth, daily_logs, devices, goals, habits, income, life_areas, meals, milestones, profile, projects, questionnaire,
+    screen_time, sleep, social, stats, todos, xp,
 )
 
 logger = logging.getLogger("life_rpg")
@@ -61,6 +61,7 @@ app.include_router(devices.router)
 app.include_router(profile.router)
 app.include_router(goals.router)
 app.include_router(meals.router)
+app.include_router(questionnaire.router)
 
 
 @app.get("/health")
