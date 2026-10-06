@@ -8,7 +8,7 @@ from app.database import get_db
 from app.deps import get_current_user
 from app.models import DailyLog, User
 from app.schemas import DailyLogBatchIn, DailyLogIn, DailyLogOut
-from app.services import daily_logs, profiles
+from app.services import daily_logs, log_fields, profiles
 
 router = APIRouter(prefix="/daily-logs", tags=["daily-logs"])
 
@@ -38,6 +38,12 @@ def list_logs(start: date, end: date, current_user: User = Depends(get_current_u
     if end < start or (end - start).days > MAX_RANGE_DAYS:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Range must be 0-{MAX_RANGE_DAYS} days")
     return [_to_schema(log) for log in daily_logs.list_logs(db, current_user, start, end)]
+
+
+@router.get("/fields")
+def list_fields():
+    """Every value a day can hold: label, unit, kind, usual source and the stats that read it."""
+    return log_fields.catalog()
 
 
 @router.get("/{day}", response_model=DailyLogOut)
