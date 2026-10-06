@@ -23,6 +23,17 @@ STATS = [
     ('WLT', 'Wealth'),
 ]
 
+# The six areas of a life the stats are grouped into. Each area is the average of its stats that have
+# data, and TOTAL is the average of the areas, so every area counts the same however many stats it has.
+CATEGORIES = [
+    ('mental', 'Mental', ['MP', 'FOC']),       # mental energy and attention
+    ('physical', 'Physical', ['PS', 'STA', 'H']),  # strength, endurance, eating and weight
+    ('practical', 'Practical', ['WLT']),       # earning and providing
+    ('cultural', 'Cultural', ['INT']),         # learning, reading, skills
+    ('discipline', 'Discipline', ['DIS']),     # doing what you said you'd do
+    ('social', 'Social', ['SOC']),             # people
+]
+
 SLEEP_NEED = 7.5  # hours/night; adult consensus range is 7-9
 
 # --- Mental Power curves (x → 0-1 unless noted) ---------------------------
@@ -450,7 +461,7 @@ def wealth(data):
 
 
 def character_sheet(data, day, pushup_requirement=100, sleep_need=SLEEP_NEED):
-    """All stats for one day, plus an overall score averaged over the stats that have data"""
+    """All stats for one day, their six categories, and an overall score averaged over the categories that have data"""
     logs = data.get('daily_logs', {})
     sheet = {
         'MP': mental_power(logs, day, sleep_need),
@@ -463,5 +474,15 @@ def character_sheet(data, day, pushup_requirement=100, sleep_need=SLEEP_NEED):
         'SOC': social(data, day),
         'WLT': wealth(data),
     }
-    scores = [s['score'] for s in sheet.values() if s['score'] is not None]
-    return {'stats': sheet, 'overall': round(mean(scores)) if scores else None}
+    categories = category_scores({code: stat['score'] for code, stat in sheet.items()})
+    scores = [score for score in categories.values() if score is not None]
+    return {'stats': sheet, 'categories': categories, 'overall': round(mean(scores)) if scores else None}
+
+
+def category_scores(stat_scores):
+    """{category key: average of its stats that have data, or None}"""
+    result = {}
+    for key, _, codes in CATEGORIES:
+        known = [stat_scores[code] for code in codes if stat_scores.get(code) is not None]
+        result[key] = round(mean(known)) if known else None
+    return result

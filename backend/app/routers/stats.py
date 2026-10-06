@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import get_current_user
 from app.models import DailyScore, EpicMilestone, Habit, Income, LifeArea, User
-from app.schemas import CharacterDay, CharacterSheetOut, DailyScoreOut, HabitStatus, LevelOut, StatResult, StatsOut, StreaksOut
+from app.schemas import CategoryResult, CharacterDay, CharacterSheetOut, DailyScoreOut, HabitStatus, LevelOut, StatResult, StatsOut, StreaksOut
 from app.services import character_stats, daily_logs, levels, profiles, rpg_logic, streaks
 
 router = APIRouter(prefix="/stats", tags=["stats"])
@@ -53,7 +53,7 @@ def _sheet(db: Session, user: User, data: dict, day: date) -> dict:
 
 @router.get("/character", response_model=CharacterSheetOut)
 def character_sheet(day: date | None = None, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """MP, PS, STA, INT, DIS, SOC, WLT for one day (default: today in the configured timezone)."""
+    """Every stat and the six categories they make up, for one day (default: today in the configured timezone)."""
     day = day or profiles.today(db, current_user)
     data = daily_logs.stats_input(db, current_user, day)
     sheet = _sheet(db, current_user, data, day)
@@ -62,6 +62,10 @@ def character_sheet(day: date | None = None, current_user: User = Depends(get_cu
         date=day,
         overall=sheet['overall'],
         overall_grade=grade(sheet['overall']),
+        categories=[
+            CategoryResult(key=key, name=name, score=sheet['categories'][key], grade=grade(sheet['categories'][key]), stats=codes)
+            for key, name, codes in character_stats.CATEGORIES
+        ],
         stats=[
             StatResult(code=code, name=name, grade=grade(sheet['stats'][code]['score']), **sheet['stats'][code])
             for code, name in character_stats.STATS
@@ -76,7 +80,7 @@ MAX_HISTORY_DAYS = 92
 def character_history(
     start: date, end: date | None = None, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
-    """Every stat's score for each day from start to end (default today), for charts."""
+    """Every stat's and category's score for each day from start to end (default today), for charts."""
     end = end or profiles.today(db, current_user)
     if end < start or (end - start).days >= MAX_HISTORY_DAYS:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Range must be 1-{MAX_HISTORY_DAYS} days")
@@ -86,7 +90,8 @@ def character_history(
         day = start + timedelta(days=offset)
         sheet = _sheet(db, current_user, data, day)
         history.append(CharacterDay(
-            date=day, overall=sheet['overall'], scores={code: stat['score'] for code, stat in sheet['stats'].items()}
+            date=day, overall=sheet['overall'], scores={code: stat['score'] for code, stat in sheet['stats'].items()},
+            categories=sheet['categories'],
         ))
     return history
 

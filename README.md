@@ -168,6 +168,19 @@ More than 1 week late: 0.5x XP
 
 Menu **19 · Daily Check-in** asks about sleep, work, screen time, body and social contact once a day (Enter skips a question; run it again later to fill gaps, or backfill a past date). Menu **20 · Character Sheet** turns that into nine stats, each 0-100 and ranked on the same F → SSS ladder as the daily grade. The formulas live in `backend/app/services/character_stats.py`, shared by this app and the server.
 
+The nine stats are grouped into **six categories**, each the average of its stats that have data:
+
+| Category | Stats |
+|---|---|
+| 🧠 Mental | MP (Mental Power), FOC (Focus) |
+| 💪 Physical | PS (Physical Strength), STA (Stamina), H (Health) |
+| 🛠️ Practical | WLT (Wealth) |
+| 📚 Cultural | INT (Intellect) |
+| 🛡️ Discipline | DIS (Discipline) |
+| 👥 Social | SOC (Social) |
+
+**TOTAL** is the average of the categories that have data, so each area of life counts the same however many stats it has.
+
 Rules shared by every stat:
 - Each stat is a weighted average of components (0-1 each). **A component with no data is left out** and the rest are rescaled, so skipping a question never counts as a zero. `data %` shows how much of the formula real data covered.
 - Rolling stats need **3+ logged days** (training consistency needs 7) so one good day doesn't read as a habit.
@@ -220,8 +233,8 @@ The backend in `backend/` stores daily logs and serves the same character sheet:
 | `POST /daily-logs/batch?source=` `{"days": [{"date": …, "sleep": …}]}` | device or login | Up to 31 days in one request (catching up after being offline) |
 | `DELETE /daily-logs/{day}?source=&section=&field=` | device or login | Whole day, one source, one section or one field; e.g. `?source=manual&section=sleep&field=hours` drops a correction |
 | `GET /daily-logs?start=&end=` · `GET /daily-logs/{day}` | device or login | Raw `auto`, `manual` and `merged` data |
-| `GET /stats/character?day=` | device or login | All seven stats with breakdowns |
-| `GET /stats/character/history?start=&end=` | device or login | Scores per day (up to 92 days), for charts |
+| `GET /stats/character?day=` | device or login | The six categories and all nine stats with breakdowns; TOTAL = average of the categories |
+| `GET /stats/character/history?start=&end=` | device or login | Stat and category scores per day (up to 92 days), for charts |
 
 Everything else the app can manage (device or login token):
 

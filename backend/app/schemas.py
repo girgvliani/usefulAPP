@@ -358,10 +358,20 @@ class StatResult(BaseModel):
     penalties: list[StatPenalty]
 
 
+class CategoryResult(BaseModel):
+    """One of the six areas: the average of its stats that have data."""
+    key: str
+    name: str
+    score: int | None
+    grade: str | None
+    stats: list[str]  # stat codes, in display order
+
+
 class CharacterSheetOut(BaseModel):
     date: date
-    overall: int | None
+    overall: int | None  # average of the categories that have data
     overall_grade: str | None
+    categories: list[CategoryResult]
     stats: list[StatResult]
 
 
@@ -370,6 +380,7 @@ class CharacterDay(BaseModel):
     date: date
     overall: int | None
     scores: dict[str, int | None]
+    categories: dict[str, int | None] = {}
 
 
 # ---- Profile ----

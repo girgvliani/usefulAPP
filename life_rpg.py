@@ -562,15 +562,19 @@ class PersonalLifeRPG:
         print("\n" + "="*70)
         print(f"🧬 CHARACTER SHEET · {day}".center(70))
         print("="*70)
-        for code, name in stats.STATS:
-            result = sheet['stats'][code]
-            color = STAT_COLORS[code]
-            if result['score'] is None:
-                print(f"  {color}{code:4} {name:18}{RESET} | {result['components'][0]['note']}")
-                continue
-            score = result['score']
-            bar = "█" * (score // 10) + "░" * (10 - score // 10)
-            print(f"  {color}{code:4} {name:18} [{bar}] {score:3}  {stats.grade(score):3}{RESET} | data {result['confidence']:3}%")
+        names = dict(stats.STATS)
+        for key, title, codes in stats.CATEGORIES:
+            area = sheet['categories'][key]
+            print(f"  {title.upper():24}" + (f"{area:3}  {stats.grade(area)}" if area is not None else "no data yet"))
+            for code in codes:
+                result = sheet['stats'][code]
+                color = STAT_COLORS[code]
+                if result['score'] is None:
+                    print(f"    {color}{code:4} {names[code]:18}{RESET} | {result['components'][0]['note']}")
+                    continue
+                score = result['score']
+                bar = "█" * (score // 10) + "░" * (10 - score // 10)
+                print(f"    {color}{code:4} {names[code]:18} [{bar}] {score:3}  {stats.grade(score):3}{RESET} | data {result['confidence']:3}%")
         print("-"*70)
         if sheet['overall'] is not None:
             print(f"  OVERALL RANK: {stats.grade(sheet['overall'])} ({sheet['overall']}/100)")
