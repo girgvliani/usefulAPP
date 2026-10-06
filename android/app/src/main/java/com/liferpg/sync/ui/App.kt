@@ -152,6 +152,7 @@ fun LifeRpgApp(sharedPhoto: Uri? = null, onSharedPhotoUsed: () -> Unit = {}) {
                             Dest.Projects -> ProjectsScreen(api)
                             Dest.Skills -> SkillsScreen(api)
                             Dest.Questionnaire -> QuestionnaireScreen(api, onOpen = { open(it) })
+                            Dest.Friends -> FriendsScreen(api)
                             Dest.About -> AboutScreen(api, onOpen = { open(it) })
                             Dest.Profile -> ProfileScreen(api)
                             Dest.Settings -> SettingsScreen(settings, api, onConnected = { connection++ })

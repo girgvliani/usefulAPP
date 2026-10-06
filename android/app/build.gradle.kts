@@ -11,8 +11,8 @@ android {
         applicationId = "com.liferpg.sync"
         minSdk = 29
         targetSdk = 36
-        versionCode = 7
-        versionName = "0.7"
+        versionCode = 9
+        versionName = "0.9"
     }
 
     buildFeatures {

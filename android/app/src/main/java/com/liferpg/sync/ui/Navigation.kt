@@ -39,6 +39,7 @@ enum class Dest(val label: String, val short: String, val icon: String, val grou
     Quests("Quests", "Quests", "📜", "Plan", "To-dos with deadlines that earn XP"),
     Projects("Projects", "Projects", "💼", "Plan", "Paid work that feeds Wealth"),
     Skills("Skills", "Skills", "🌳", "Plan", "The life areas your XP levels up"),
+    Friends("Friends", "Friends", "👥", "You", "Compare with friends you choose"),
     Questionnaire("Questionnaire", "Quiz", "🧭", "You", "What matters to you, and your plan"),
     About("About you", "About", "🪪", "You", "Everything your stats are built from"),
     Profile("Profile & targets", "Profile", "🧍", "You", "Daily targets, body, income goal"),

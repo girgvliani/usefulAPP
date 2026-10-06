@@ -70,6 +70,37 @@ class Api(private val settings: Settings) {
     /** Every attempt, newest first */
     suspend fun attempts(): List<Attempt> = list("/questionnaire/attempts", ::parseAttempt)
 
+    // ---- Friends
+
+    suspend fun friends(): FriendsOverview = parseFriendsOverview(JSONObject(call("GET", "/friends")!!))
+
+    /** Turns sharing switches on or off (level, stats, streaks, goals); applies to all friends */
+    suspend fun updateSharing(body: JSONObject) {
+        call("PATCH", "/friends/sharing", body)
+    }
+
+    /** By friend code (K7QF-M2XA) or email, whichever [who] looks like. Returns "pending" or "accepted". */
+    suspend fun addFriend(who: String): String {
+        val body = if ("@" in who) JSONObject().put("email", who.trim()) else JSONObject().put("code", who.trim())
+        return JSONObject(call("POST", "/friends/requests", body)!!).getString("status")
+    }
+
+    suspend fun acceptFriend(requestId: Int) {
+        call("POST", "/friends/requests/$requestId/accept")
+    }
+
+    /** Decline a request to you, or take back one you sent */
+    suspend fun dropRequest(requestId: Int) {
+        call("DELETE", "/friends/requests/$requestId")
+    }
+
+    suspend fun removeFriend(userId: Int) {
+        call("DELETE", "/friends/$userId")
+    }
+
+    /** You (everything) and your friends (what they share) */
+    suspend fun leaderboard(): List<FriendView> = list("/friends/leaderboard", ::parseFriendView)
+
     /** Drop one check-in value so the phone's value shows through again */
     suspend fun clearManual(date: LocalDate, section: String, field: String) {
         call("DELETE", "/daily-logs/$date?source=manual&section=$section&field=$field")

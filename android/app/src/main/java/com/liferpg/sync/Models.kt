@@ -436,3 +436,81 @@ fun parseQuestionnaire(json: JSONObject) = Questionnaire(
     prefill = json.optJSONObject("prefill") ?: JSONObject(),
     latest = json.optJSONObject("latest")?.let(::parseAttempt),
 )
+
+// ---- Friends (each person shares only what they've switched on)
+
+data class FriendLevel(val level: Int, val title: String, val xp: Int, val weekXp: Int)
+
+data class FriendCategory(val key: String, val name: String, val score: Int?, val grade: String?, val change: Int?)
+
+data class FriendStats(
+    val total: Int?,
+    val totalGrade: String?,
+    val totalChange: Int?,  // TOTAL now minus a week ago
+    val categories: List<FriendCategory>,
+    val stats: List<Pair<String, Int?>>,  // stat code to score
+)
+
+data class FriendStreak(val name: String, val emoji: String, val current: Int, val best: Int)
+
+data class FriendGoal(val title: String, val progress: Double?, val achieved: Boolean)
+
+/** A person as friends see them; a section is null when they don't share it */
+data class FriendView(
+    val id: Int,
+    val name: String,
+    val code: String,
+    val me: Boolean,
+    val level: FriendLevel?,
+    val stats: FriendStats?,
+    val streaks: List<FriendStreak>?,
+    val goals: List<FriendGoal>?,
+)
+
+data class FriendRequest(val requestId: Int, val name: String, val code: String)
+
+data class FriendsOverview(
+    val code: String,
+    val sharing: Map<String, Boolean>,
+    val friends: List<FriendView>,
+    val incoming: List<FriendRequest>,
+    val outgoing: List<FriendRequest>,
+)
+
+private fun JSONObject.intOrNullOpt(key: String): Int? = if (!has(key) || isNull(key)) null else getInt(key)
+
+fun parseFriendView(json: JSONObject) = FriendView(
+    id = json.getInt("id"),
+    name = json.getString("name"),
+    code = json.getString("code"),
+    me = json.optBoolean("me"),
+    level = json.optJSONObject("level")?.let { FriendLevel(it.getInt("level"), it.getString("title"), it.getInt("xp"), it.getInt("week_xp")) },
+    stats = json.optJSONObject("stats")?.let { s ->
+        FriendStats(
+            total = s.intOrNullOpt("total"),
+            totalGrade = s.optString("total_grade").takeIf { !s.isNull("total_grade") && it.isNotEmpty() },
+            totalChange = s.intOrNullOpt("total_change"),
+            categories = s.getJSONArray("categories").map { c ->
+                FriendCategory(c.getString("key"), c.getString("name"), c.intOrNullOpt("score"),
+                    c.optString("grade").takeIf { !c.isNull("grade") && it.isNotEmpty() }, c.intOrNullOpt("change"))
+            },
+            stats = s.getJSONArray("stats").map { it.getString("code") to it.intOrNullOpt("score") },
+        )
+    },
+    streaks = json.optJSONArray("streaks")?.map { FriendStreak(it.getString("name"), it.getString("emoji"), it.getInt("current"), it.getInt("best")) },
+    goals = json.optJSONArray("goals")?.map { g ->
+        FriendGoal(g.getString("title"), if (g.isNull("progress")) null else g.getDouble("progress"), g.optBoolean("achieved"))
+    },
+)
+
+fun parseFriendsOverview(json: JSONObject): FriendsOverview {
+    val sharing = json.getJSONObject("sharing")
+    fun requests(key: String) = json.getJSONArray(key).map { FriendRequest(it.getInt("request_id"), it.getString("name"), it.getString("code")) }
+    return FriendsOverview(
+        code = json.getString("code"),
+        sharing = sharing.keys().asSequence().associateWith { sharing.getBoolean(it) },
+        friends = json.getJSONArray("friends").map(::parseFriendView),
+        incoming = requests("incoming"),
+        outgoing = requests("outgoing"),
+    )
+}
