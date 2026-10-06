@@ -63,7 +63,7 @@ fun SettingsScreen(settings: Settings, api: Api, onConnected: () -> Unit) {
         PermissionsCard()
         if (settings.isConfigured) GogginsCard(settings)
         SyncCard(settings)
-        if (settings.isConfigured) ProfileCard(api)
+        if (settings.isConfigured) Text("Your targets, body and income goal are in ☰ → Profile & targets.", color = Rpg.Muted, fontSize = 13.sp)
     }
 }
 
@@ -245,6 +245,15 @@ private fun SyncCard(settings: Settings) {
             color = Rpg.Muted, fontSize = 12.sp,
         )
         Text(status, fontFamily = FontFamily.Monospace, fontSize = 12.sp, color = Rpg.Muted)
+    }
+}
+
+/** Daily targets, body and income goal: what the shared formulas measure you against. */
+@Composable
+fun ProfileScreen(api: Api) {
+    Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Text("PROFILE", style = MaterialTheme.typography.headlineLarge, color = Rpg.Accent)
+        ProfileCard(api)
     }
 }
 

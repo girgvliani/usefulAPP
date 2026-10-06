@@ -165,7 +165,7 @@ internal fun Totals(day: DayMeals) {
                     )
                 } else {
                     Text("${day.kcal.toInt()} kcal today", fontWeight = FontWeight.Black, fontSize = 20.sp)
-                    Text("Add your ${day.targets.missing.joinToString(", ")} (Settings › profile, weight in Check-in) to get a calorie target.",
+                    Text("Add your ${day.targets.missing.joinToString(", ")} (☰ → Profile & targets, weight in Check-in) to get a calorie target.",
                         color = Rpg.Muted, fontSize = 12.sp)
                 }
                 day.targets.protein?.let { protein ->

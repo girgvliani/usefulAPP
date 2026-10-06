@@ -27,6 +27,12 @@ class Api(private val settings: Settings) {
 
     suspend fun streaksJson(): String = call("GET", "/stats/streaks")!!
 
+    /** Every stat's and category's score for each of the last [days] days, oldest first */
+    suspend fun history(days: Int): List<HistoryDay> {
+        val start = LocalDate.now().minusDays((days - 1).toLong())
+        return list("/stats/character/history?start=$start", ::parseHistoryDay)
+    }
+
     suspend fun levelJson(): String = call("GET", "/stats/level")!!
 
     suspend fun level(): Level = parseLevel(JSONObject(levelJson()))
@@ -41,6 +47,18 @@ class Api(private val settings: Settings) {
     /** Check-in values; they override the phone's values field by field */
     suspend fun saveManual(date: LocalDate, sections: JSONObject): DayLog =
         parseDayLog(JSONObject(call("PUT", "/daily-logs/$date?source=manual", sections)!!))
+
+    /** Every day that has something logged between [start] and [end], by ISO date */
+    suspend fun days(start: LocalDate, end: LocalDate): Map<String, DayLog> =
+        list("/daily-logs?start=$start&end=$end", ::parseDayLog).associateBy { it.date }
+
+    /** What each value is, how it's entered and which stats read it */
+    suspend fun fields(): FieldCatalog = parseFieldCatalog(JSONObject(call("GET", "/daily-logs/fields")!!))
+
+    /** Remove one value: source "manual" (your correction), "auto" (the phone's) or "all" */
+    suspend fun clearField(date: LocalDate, section: String, field: String, source: String) {
+        call("DELETE", "/daily-logs/$date?source=$source&section=$section&field=$field")
+    }
 
     /** Drop one check-in value so the phone's value shows through again */
     suspend fun clearManual(date: LocalDate, section: String, field: String) {
@@ -96,6 +114,70 @@ class Api(private val settings: Settings) {
 
     suspend fun deleteMeal(id: Int) {
         call("DELETE", "/meals/$id")
+    }
+
+    // ---- Plan: milestones, quests (todos), projects, skills (life areas)
+
+    suspend fun milestones(): List<Milestone> = list("/milestones", ::parseMilestone)
+
+    suspend fun createMilestone(description: String, xp: Int): Milestone =
+        parseMilestone(JSONObject(call("POST", "/milestones", JSONObject().put("description", description).put("xp_reward", xp))!!))
+
+    suspend fun updateMilestone(key: String, description: String, xp: Int): Milestone =
+        parseMilestone(JSONObject(call("PATCH", "/milestones/$key", JSONObject().put("description", description).put("xp_reward", xp))!!))
+
+    suspend fun completeMilestone(key: String) {
+        call("POST", "/milestones/$key/complete")
+    }
+
+    suspend fun deleteMilestone(key: String) {
+        call("DELETE", "/milestones/$key")
+    }
+
+    suspend fun quests(): List<Quest> = list("/todos", ::parseQuest)
+
+    /** body: task, area_id, base_xp, deadline (all of them to create, any of them to update) */
+    suspend fun createQuest(body: JSONObject): Quest = parseQuest(JSONObject(call("POST", "/todos", body)!!))
+
+    suspend fun updateQuest(id: Int, body: JSONObject): Quest = parseQuest(JSONObject(call("PATCH", "/todos/$id", body)!!))
+
+    suspend fun completeQuest(id: Int) {
+        call("POST", "/todos/$id/complete")
+    }
+
+    suspend fun deleteQuest(id: Int) {
+        call("DELETE", "/todos/$id")
+    }
+
+    suspend fun projects(): List<Project> = list("/projects", ::parseProject)
+
+    /** body: name, value, deadline */
+    suspend fun createProject(body: JSONObject): Project = parseProject(JSONObject(call("POST", "/projects", body)!!))
+
+    suspend fun updateProject(id: Int, body: JSONObject): Project = parseProject(JSONObject(call("PATCH", "/projects/$id", body)!!))
+
+    suspend fun completeProject(id: Int) {
+        call("POST", "/projects/$id/complete")
+    }
+
+    suspend fun deleteProject(id: Int) {
+        call("DELETE", "/projects/$id")
+    }
+
+    suspend fun skills(): List<Skill> = list("/life-areas", ::parseSkill)
+
+    suspend fun createSkill(name: String): Skill = parseSkill(JSONObject(call("POST", "/life-areas", JSONObject().put("name", name))!!))
+
+    suspend fun renameSkill(id: Int, name: String): Skill =
+        parseSkill(JSONObject(call("PATCH", "/life-areas/$id", JSONObject().put("name", name))!!))
+
+    suspend fun deleteSkill(id: Int) {
+        call("DELETE", "/life-areas/$id")
+    }
+
+    private suspend fun <T> list(path: String, parse: (JSONObject) -> T): List<T> {
+        val rows = JSONArray(call("GET", path)!!)
+        return (0 until rows.length()).map { parse(rows.getJSONObject(it)) }
     }
 
     suspend fun income(): Income = parseIncome(JSONObject(call("GET", "/income")!!))

@@ -37,6 +37,7 @@ import com.liferpg.sync.Goal
 import com.liferpg.sync.GogginsMode
 import kotlinx.coroutines.launch
 import org.json.JSONObject
+import java.time.LocalDate
 
 private val GOAL_TYPES = listOf(
     "weight" to "⚖️ Weight",
@@ -45,6 +46,19 @@ private val GOAL_TYPES = listOf(
     "sleep" to "😴 Sleep",
     "income" to "💰 Income",
     "custom" to "✨ Custom",
+)
+
+/** A ready-made goal; empty fields are left for the user to fill in. */
+internal data class GoalPreset(val label: String, val type: String, val target: String = "", val title: String = "", val unit: String = "", val start: String = "")
+
+internal val GOAL_PRESETS = listOf(
+    GoalPreset("⚖️ Lose weight", "weight"),
+    GoalPreset("💪 50 push-ups in a row", "max_pushups", target = "50"),
+    GoalPreset("👟 10,000 steps a day", "steps", target = "10000"),
+    GoalPreset("😴 Sleep 8 hours", "sleep", target = "8"),
+    GoalPreset("💰 Monthly income", "income"),
+    GoalPreset("📚 Read 12 books", "custom", target = "12", title = "Read 12 books", unit = "books", start = "0"),
+    GoalPreset("🏃 Run 100 km", "custom", target = "100", title = "Run 100 km", unit = "km", start = "0"),
 )
 
 @Composable
@@ -58,27 +72,29 @@ fun GoalsScreen(api: Api) {
             levelScope.launch { levelState?.refresh() }  // a reached goal is +250 XP
         }
     }
-    var creating by remember { mutableStateOf(false) }
+    var creating by remember { mutableStateOf<GoalPreset?>(null) }
 
     LoadView(goals) { list ->
         Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("GOALS", Modifier.weight(1f), style = androidx.compose.material3.MaterialTheme.typography.headlineLarge, color = Rpg.Accent)
-                Button(onClick = { creating = true }) { Text("+ New goal") }
+                Button(onClick = { creating = GoalPreset("", "weight") }) { Text("+ New goal") }
             }
             if (list.isEmpty()) {
-                Text("No goals yet. Losing or gaining weight, a push-up record, an income target, or anything custom.", color = Rpg.Muted)
+                Text("No goals yet. Pick one to start, or make your own:", color = Rpg.Muted)
+                GoalPresetChips { creating = it }
             }
             list.forEach { GoalCard(api, it, onChanged = goals::reload) }
         }
     }
-    if (creating) NewGoalDialog(api, onDone = { creating = false; goals.reload() }, onCancel = { creating = false })
+    creating?.let { preset -> NewGoalDialog(api, preset, onDone = { creating = null; goals.reload() }, onCancel = { creating = null }) }
 }
 
 @Composable
 internal fun GoalCard(api: Api, goal: Goal, onChanged: () -> Unit) {
     val scope = rememberCoroutineScope()
     var confirmDelete by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf(false) }
     var newValue by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     val color = if (goal.achieved) Rpg.Good else Rpg.Accent
@@ -120,8 +136,8 @@ internal fun GoalCard(api: Api, goal: Goal, onChanged: () -> Unit) {
             }
         }
 
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (goal.type == "custom") {
+        if (goal.type == "custom") {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = newValue, onValueChange = { newValue = it }, singleLine = true,
                     label = { Text("New value") }, modifier = Modifier.width(140.dp),
@@ -136,13 +152,15 @@ internal fun GoalCard(api: Api, goal: Goal, onChanged: () -> Unit) {
                     }
                 }) { Text("Update") }
             }
-            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = { confirmDelete = true }) { Text("Delete", color = Rpg.Bad) }
-            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            TextButton(onClick = { editing = true }) { Text("Edit") }
+            TextButton(onClick = { confirmDelete = true }) { Text("Delete", color = Rpg.Bad) }
         }
         error?.let { Text("❌ $it", color = Rpg.Bad, fontSize = 13.sp) }
     }
 
+    if (editing) EditGoalDialog(api, goal, onDone = { editing = false; onChanged() }, onCancel = { editing = false })
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
@@ -160,13 +178,19 @@ internal fun GoalCard(api: Api, goal: Goal, onChanged: () -> Unit) {
 }
 
 @Composable
-private fun NewGoalDialog(api: Api, onDone: () -> Unit, onCancel: () -> Unit) {
+internal fun GoalPresetChips(onPick: (GoalPreset) -> Unit) {
+    ChoiceChips(GOAL_PRESETS.map { it to it.label }, null, onPick)
+}
+
+@Composable
+internal fun NewGoalDialog(api: Api, preset: GoalPreset, onDone: () -> Unit, onCancel: () -> Unit) {
     val scope = rememberCoroutineScope()
-    var type by remember { mutableStateOf("weight") }
-    var target by remember { mutableStateOf("") }
-    var start by remember { mutableStateOf("") }
-    var title by remember { mutableStateOf("") }
-    var unit by remember { mutableStateOf("") }
+    var type by remember { mutableStateOf(preset.type) }
+    var target by remember { mutableStateOf(preset.target) }
+    var start by remember { mutableStateOf(preset.start) }
+    var title by remember { mutableStateOf(preset.title) }
+    var unit by remember { mutableStateOf(preset.unit) }
+    var deadline by remember { mutableStateOf<LocalDate?>(null) }
     var current by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var intensity by remember { mutableIntStateOf(5) }
@@ -176,7 +200,7 @@ private fun NewGoalDialog(api: Api, onDone: () -> Unit, onCancel: () -> Unit) {
         onDismissRequest = onCancel,
         title = { Text("New goal") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     GOAL_TYPES.forEach { (value, label) ->
                         FilterChip(selected = type == value, onClick = { type = value }, label = { Text(label) })
@@ -198,6 +222,7 @@ private fun NewGoalDialog(api: Api, onDone: () -> Unit, onCancel: () -> Unit) {
                 Text(GogginsMode.describe(intensity), color = Rpg.Muted, fontSize = 12.sp)
                 NumberField(start, { start = it }, if (custom) "Start" else "Start (empty = your latest value)")
                 if (custom) NumberField(current, { current = it }, "Where you are now (optional)")
+                DeadlinePicker(deadline, { deadline = it }, optional = true)
                 error?.let { Text("❌ $it", color = Rpg.Bad, fontSize = 13.sp) }
             }
         },
@@ -207,6 +232,7 @@ private fun NewGoalDialog(api: Api, onDone: () -> Unit, onCancel: () -> Unit) {
                     error = runCatching {
                         val body = JSONObject().put("type", type).put("target_value", number(target, "Target")).put("intensity", intensity)
                         if (start.isNotBlank()) body.put("start_value", number(start, "Start"))
+                        deadline?.let { body.put("deadline", it.toString()) }
                         if (custom) {
                             if (title.isNotBlank()) body.put("title", title.trim())
                             if (unit.isNotBlank()) body.put("unit", unit.trim())
@@ -220,6 +246,30 @@ private fun NewGoalDialog(api: Api, onDone: () -> Unit, onCancel: () -> Unit) {
         },
         dismissButton = { TextButton(onClick = onCancel) { Text("Cancel") } },
     )
+}
+
+/** Rename, move the target or start, change the deadline. Progress follows on its own. */
+@Composable
+private fun EditGoalDialog(api: Api, goal: Goal, onDone: () -> Unit, onCancel: () -> Unit) {
+    var title by remember { mutableStateOf(goal.title) }
+    var target by remember { mutableStateOf(fmt(goal.targetValue)) }
+    var start by remember { mutableStateOf(fmt(goal.startValue)) }
+    var deadline by remember { mutableStateOf(goal.deadline?.let(LocalDate::parse)) }
+    FormDialog("Edit goal", "Save", onSave = {
+        val body = JSONObject()
+            .put("title", required(title, "Title"))
+            .put("target_value", number(target, "Target"))
+            .put("start_value", number(start, "Start"))
+        // The server has no "clear deadline"; an unchanged or new date is sent as is
+        deadline?.let { body.put("deadline", it.toString()) }
+        api.updateGoal(goal.id, body)
+        onDone()
+    }, onDismiss = onCancel) {
+        TextInput(title, { title = it }, "Title")
+        NumberField(start, { start = it }, "Start (${goal.unit})")
+        NumberField(target, { target = it }, "Target (${goal.unit})")
+        DeadlinePicker(deadline, { deadline = it }, optional = goal.deadline == null)
+    }
 }
 
 @Composable

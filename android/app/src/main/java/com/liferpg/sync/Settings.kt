@@ -55,6 +55,11 @@ class Settings(context: Context) {
         get() = prefs.getStringSet("goggins_apps", null) ?: GogginsMode.DEFAULT_APPS
         set(value) = prefs.edit { putStringSet("goggins_apps", value) }
 
+    /** Screens on the bottom bar, in order (names of ui.Dest); null until customized */
+    var pinnedTabs: List<String>?
+        get() = prefs.getString("pinned_tabs", null)?.split(',')?.filter { it.isNotEmpty() }
+        set(value) = prefs.edit { if (value == null) remove("pinned_tabs") else putString("pinned_tabs", value.joinToString(",")) }
+
     companion object {
         const val DEFAULT_SERVER = "https://api-production-0c5a.up.railway.app"
     }

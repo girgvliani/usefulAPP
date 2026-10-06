@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.liferpg.sync.ui.CategoryContent
 import com.liferpg.sync.ui.CharacterSheetView
 import com.liferpg.sync.ui.GoalCard
 import com.liferpg.sync.ui.LevelHero
@@ -18,6 +19,7 @@ import com.liferpg.sync.ui.LevelHud
 import com.liferpg.sync.ui.LevelUpContent
 import com.liferpg.sync.ui.LifeRpgTheme
 import com.liferpg.sync.ui.MealCard
+import com.liferpg.sync.ui.StatDetailContent
 import com.liferpg.sync.ui.Totals
 import com.liferpg.sync.ui.Rpg
 import org.junit.Test
@@ -36,11 +38,52 @@ class ScreenshotTest {
     fun characterSheet() = capture("character") { CharacterSheetView(SAMPLE_SHEET, "Nick", SAMPLE_LEVEL, onRefresh = {}) }
 
     @Test
+    fun categoryPage() = capture("category_mental") {
+        val mental = SAMPLE_SHEET.categories.first()
+        val history = (0 until 30).map { "2026-09-%02d".format(it + 1) to if (it in 3..4) null else 48 + (it * 5 % 25) }
+        CategoryContent(mental, SAMPLE_SHEET.statsOf(mental), history, onBack = {}, onOpenStat = {})
+    }
+
+    @Test
     fun goals() = capture("goals") {
         val api = Api(Settings(LocalContext.current))
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             SAMPLE_GOALS.forEach { GoalCard(api, it, onChanged = {}) }
         }
+    }
+
+    @Test
+    fun mentalPowerPage() = capture("stat_mp") {
+        val mp = Stat(
+            code = "MP", name = "Mental Power", score = 74, grade = "A-", confidence = 100, ceiling = 85,
+            ceilingNote = "capped by 6.25h of sleep", bestMove = "Reels / Shorts / TikTok", bestMovePoints = 8,
+            components = listOf(
+                StatComponent("Sleep last night", 25.0, 0.81, "6.25h"),
+                StatComponent("Sleep debt (7 days)", 10.0, 0.62, "6.1h owed over 7 nights"),
+                StatComponent("Sleep regularity", 8.0, 0.8, "bedtime drifts ±42 min"),
+                StatComponent("Sleep quality", 7.0, 0.65, "late caffeine, screen before bed"),
+                StatComponent("Deep work", 25.0, 0.9, "3h focused"),
+                StatComponent("Physical activity", 12.0, 1.0, "35 min, 9200 steps"),
+                StatComponent("Outdoors", 8.0, 0.75, "15 min"),
+                StatComponent("Meditation", 5.0, 0.0, "0 min"),
+            ),
+            penalties = listOf(StatPenalty("Reels / Shorts / TikTok", 8.0, "60 min"), StatPenalty("Overwork this week", 3.0, "52h in 7 days")),
+        )
+        val history = (0 until 30).map { "2026-09-%02d".format(it + 1) to if (it in 10..11) null else 55 + (it * 7 % 30) }
+        StatDetailContent(mp, history, onBack = {})
+    }
+
+    @Test
+    fun drainsAndTrend() = capture("stat_mp_bottom") {
+        // The bottom of a stat page: a category, the drains and the 30-day trend
+        val mp = Stat(
+            code = "MP", name = "Mental Power", score = 74, grade = "A-", confidence = 100, ceiling = null, ceilingNote = "",
+            bestMove = null, bestMovePoints = null,
+            components = listOf(StatComponent("Meditation", 5.0, 0.0, "0 min")),
+            penalties = listOf(StatPenalty("Reels / Shorts / TikTok", 8.0, "60 min"), StatPenalty("Overwork this week", 3.0, "52h in 7 days")),
+        )
+        val history = (0 until 30).map { "2026-09-%02d".format(it + 1) to if (it in 10..11) null else 55 + (it * 7 % 30) }
+        StatDetailContent(mp, history, onBack = {})
     }
 
     @Test
@@ -84,8 +127,17 @@ class ScreenshotTest {
         )
 
         // One stat in each band: S-tier ones break past the A edge
+        // TOTAL is the average of the six categories: (61 + 77 + 35 + 50 + 69 + 96) / 6 ≈ 65
         val SAMPLE_SHEET = CharacterSheet(
-            date = "2026-09-30", overall = 71, overallGrade = "A-",
+            date = "2026-09-30", overall = 65, overallGrade = "B",
+            categories = listOf(
+                Category("mental", "Mental", 61, "B", listOf("MP", "FOC")),
+                Category("physical", "Physical", 77, "A", listOf("PS", "STA", "H")),
+                Category("practical", "Practical", 35, "F", listOf("WLT")),
+                Category("cultural", "Cultural", 50, "C", listOf("INT")),
+                Category("discipline", "Discipline", 69, "B", listOf("DIS")),
+                Category("social", "Social", 96, "SSS", listOf("SOC")),
+            ),
             stats = listOf(
                 stat("MP", "Mental Power", 78, "A", "Reels / Shorts / TikTok"),
                 stat("PS", "Physical Strength", 88, "S", "Max push-up test"),

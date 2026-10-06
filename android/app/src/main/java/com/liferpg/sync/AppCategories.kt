@@ -28,6 +28,13 @@ class AppCategories(private val context: Context) {
         launchers.map { it.activityInfo.packageName }.toSet() + setOf("com.android.systemui", context.packageName)
     }
 
+    /** The name the app shows under its icon, or null if it isn't installed (any more) */
+    fun label(packageName: String): String? = try {
+        context.packageManager.getApplicationLabel(appInfo(packageName)).toString()
+    } catch (e: PackageManager.NameNotFoundException) {
+        null
+    }
+
     private fun appInfo(packageName: String): ApplicationInfo {
         val pm = context.packageManager
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

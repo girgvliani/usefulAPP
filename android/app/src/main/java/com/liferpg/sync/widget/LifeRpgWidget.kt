@@ -42,6 +42,7 @@ import androidx.glance.unit.ColorProvider
 import com.liferpg.sync.Level
 import com.liferpg.sync.MainActivity
 import com.liferpg.sync.Streak
+import com.liferpg.sync.ui.categoryIcon
 import com.liferpg.sync.ui.rankColor
 import com.liferpg.sync.ui.Rpg
 
@@ -148,16 +149,22 @@ private fun Large(data: WidgetData) {
                 Text(sheet.overallGrade ?: "–", style = text(26.sp, rankColor(sheet.overallGrade), FontWeight.Bold))
                 Spacer(GlanceModifier.width(10.dp))
                 Column {
-                    Text("OVERALL ${sheet.overall ?: "–"}", style = text(11.sp, Rpg.Muted, FontWeight.Bold))
-                    Row {
-                        sheet.stats.filter { it.code in HEADLINE_STATS }.forEach {
-                            Text("${it.code} ${it.score ?: "–"}  ", style = text(12.sp, weight = FontWeight.Bold))
+                    Text("TOTAL ${sheet.overall ?: "–"}", style = text(11.sp, Rpg.Muted, FontWeight.Bold))
+                    // The category that needs you most; older servers have no categories, so a few stats instead
+                    val weakest = sheet.categories.filter { it.score != null }.minByOrNull { it.score!! }
+                    if (weakest != null) {
+                        Text("Weakest: ${categoryIcon(weakest.key)} ${weakest.name} ${weakest.score}", style = text(12.sp, weight = FontWeight.Bold))
+                    } else {
+                        Row {
+                            sheet.stats.filter { it.code in HEADLINE_STATS }.forEach {
+                                Text("${it.code} ${it.score ?: "–"}  ", style = text(12.sp, weight = FontWeight.Bold))
+                            }
                         }
                     }
                 }
             }
         }
-        // Scrolls: every streak as tiles, two per row, then every stat
+        // Scrolls: every streak as tiles, two per row, then every category and its stats
         LazyColumn(GlanceModifier.defaultWeight().fillMaxWidth()) {
             items(ordered(streaks.streaks).chunked(2), itemId = { pair -> pair.first().key.hashCode().toLong() }) { pair ->
                 Row(GlanceModifier.fillMaxWidth().padding(bottom = 4.dp)) {
@@ -167,14 +174,32 @@ private fun Large(data: WidgetData) {
                     }
                 }
             }
-            items(data.sheet?.stats.orEmpty(), itemId = { stat -> ("stat" + stat.code).hashCode().toLong() }) { stat ->
-                Row(GlanceModifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(stat.name, style = text(12.sp), modifier = GlanceModifier.defaultWeight(), maxLines = 1)
-                    Text("${stat.score ?: "–"}", style = text(13.sp, weight = FontWeight.Bold))
-                    Text("  ${stat.grade ?: ""}", style = text(12.sp, rankColor(stat.grade), FontWeight.Bold))
+            items(scoreLines(data), itemId = { line -> line.id.hashCode().toLong() }) { line ->
+                Row(GlanceModifier.fillMaxWidth().padding(top = if (line.indent) 2.dp else 6.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        line.name,
+                        style = if (line.indent) text(12.sp, Rpg.Muted) else text(12.sp, weight = FontWeight.Bold),
+                        modifier = GlanceModifier.defaultWeight().padding(start = if (line.indent) 14.dp else 0.dp),
+                        maxLines = 1,
+                    )
+                    Text("${line.score ?: "–"}", style = text(13.sp, weight = FontWeight.Bold))
+                    Text("  ${line.grade ?: ""}", style = text(12.sp, rankColor(line.grade), FontWeight.Bold))
                 }
             }
         }
+    }
+}
+
+private class ScoreLine(val id: String, val name: String, val score: Int?, val grade: String?, val indent: Boolean)
+
+/** Each category, with its stats under it when it has more than one; plain stats from an older server. */
+private fun scoreLines(data: WidgetData): List<ScoreLine> {
+    val sheet = data.sheet ?: return emptyList()
+    if (sheet.categories.isEmpty()) return sheet.stats.map { ScoreLine("stat" + it.code, it.name, it.score, it.grade, indent = false) }
+    return sheet.categories.flatMap { category ->
+        val stats = sheet.statsOf(category)
+        listOf(ScoreLine("cat" + category.key, "${categoryIcon(category.key)} ${category.name}", category.score, category.grade, indent = false)) +
+            if (stats.size > 1) stats.map { ScoreLine("stat" + it.code, it.name, it.score, it.grade, indent = true) } else emptyList()
     }
 }
 

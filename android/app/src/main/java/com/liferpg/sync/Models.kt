@@ -21,7 +21,22 @@ data class Stat(
     val penalties: List<StatPenalty>,
 )
 
-data class CharacterSheet(val date: String, val overall: Int?, val overallGrade: String?, val stats: List<Stat>)
+/** One of the six areas the stats are grouped into: the average of its stats that have data. */
+data class Category(val key: String, val name: String, val score: Int?, val grade: String?, val stats: List<String>)
+
+/** overall: the average of the categories that have data. categories is empty from a server older than them. */
+data class CharacterSheet(
+    val date: String,
+    val overall: Int?,
+    val overallGrade: String?,
+    val stats: List<Stat>,
+    val categories: List<Category> = emptyList(),
+) {
+    fun statsOf(category: Category) = category.stats.mapNotNull { code -> stats.firstOrNull { it.code == code } }
+}
+
+/** One day of history: each stat's and each category's score (null = no data that day). */
+data class HistoryDay(val date: String, val stats: Map<String, Int?>, val categories: Map<String, Int?>)
 
 data class Goal(
     val id: Int,
@@ -73,6 +88,36 @@ data class DayMeals(val date: String, val meals: List<Meal>, val kcal: Double, v
 
 data class Income(val monthlyGoal: Int, val earned: Int)
 
+/** A big one-off achievement; its XP is shared out over all your skills when you complete it. */
+data class Milestone(val key: String, val description: String, val xp: Int, val completed: Boolean)
+
+/** A to-do that earns XP for one skill: 1.5x on time, 1x up to a week late, 0.5x after that. */
+data class Quest(
+    val id: Int,
+    val task: String,
+    val skillId: Int,
+    val baseXp: Int,
+    val deadline: String,
+    val completed: Boolean,
+    val completedOn: String?,
+)
+
+/** Paid work: its value counts toward this month's income (Wealth) when completed. */
+data class Project(val id: Int, val name: String, val value: Int, val deadline: String, val completed: Boolean, val completedOn: String?)
+
+/** A life area ("Category - Skill") with its own level: 150 XP a level. */
+data class Skill(val id: Int, val name: String, val level: Int, val xp: Int) {
+    val category get() = name.substringBefore(" - ", "").ifEmpty { name }
+    val shortName get() = name.substringAfter(" - ", name)
+    val progress get() = (xp % XP_PER_LEVEL) / XP_PER_LEVEL.toFloat()
+
+    companion object {
+        const val XP_PER_LEVEL = 150
+        /** Habit and social XP land in these by name, so the server won't rename or delete them */
+        val PROTECTED = setOf("Health - Exercise", "Health - Sleep", "Health - Hygiene", "Social Balance")
+    }
+}
+
 /** Global level from all XP. progress: 0-1 through the current level. */
 data class Level(
     val level: Int,
@@ -106,7 +151,32 @@ data class Streak(
 data class Streaks(val date: String, val mood: String, val message: String, val streaks: List<Streak>)
 
 /** One day as the server holds it: what the phone sent, what you entered, and the two combined. */
-data class DayLog(val auto: JSONObject, val manual: JSONObject, val merged: JSONObject)
+data class DayLog(val auto: JSONObject, val manual: JSONObject, val merged: JSONObject, val date: String = "") {
+    fun phone(field: LogField): Any? = auto.optJSONObject(field.section)?.opt(field.key)?.takeUnless { it == JSONObject.NULL }
+    fun typed(field: LogField): Any? = manual.optJSONObject(field.section)?.opt(field.key)?.takeUnless { it == JSONObject.NULL }
+    /** What the stats use: what you typed, else what the phone sent */
+    fun value(field: LogField): Any? = typed(field) ?: phone(field)
+    /** A value by section and key, typed-in first, for values the catalog doesn't list */
+    fun raw(section: String, key: String): Any? =
+        (manual.optJSONObject(section)?.opt(key) ?: auto.optJSONObject(section)?.opt(key))?.takeUnless { it == JSONObject.NULL }
+    val isEmpty get() = auto.length() == 0 && manual.length() == 0
+}
+
+/**
+ * One value a day can hold, from the server's catalog. kind: decimal / whole / yesno / time;
+ * source: phone / checkin / both; feeds: the stat codes whose formulas read it.
+ */
+data class LogField(
+    val section: String,
+    val key: String,
+    val label: String,
+    val unit: String,
+    val kind: String,
+    val source: String,
+    val feeds: List<String>,
+)
+
+data class FieldCatalog(val sections: List<Pair<String, String>>, val fields: List<LogField>)
 
 // ---- JSON parsing (org.json, so no serialization plugin is needed)
 
@@ -139,7 +209,17 @@ fun parseCharacterSheet(json: JSONObject) = CharacterSheet(
             },
         )
     },
+    categories = json.optJSONArray("categories")?.map { c ->
+        val codes = c.getJSONArray("stats")
+        Category(c.getString("key"), c.getString("name"), c.intOrNull("score"), c.stringOrNull("grade"), (0 until codes.length()).map(codes::getString))
+    }.orEmpty(),
 )
+
+private fun JSONObject?.scores(): Map<String, Int?> =
+    this?.keys()?.asSequence()?.associateWith { if (isNull(it)) null else getInt(it) }.orEmpty()
+
+fun parseHistoryDay(json: JSONObject) =
+    HistoryDay(json.getString("date"), json.optJSONObject("scores").scores(), json.optJSONObject("categories").scores())
 
 fun parseGoal(json: JSONObject) = Goal(
     id = json.getInt("id"),
@@ -235,6 +315,42 @@ fun parseLevel(json: JSONObject) = Level(
     history = json.optJSONArray("history")?.map { it.getString("date") to it.getInt("xp") }.orEmpty(),
 )
 
+fun parseMilestone(json: JSONObject) =
+    Milestone(json.getString("key"), json.getString("description"), json.getInt("xp_reward"), json.getBoolean("completed"))
+
+fun parseQuest(json: JSONObject) = Quest(
+    id = json.getInt("id"),
+    task = json.getString("task"),
+    skillId = json.getInt("area_id"),
+    baseXp = json.getInt("base_xp"),
+    deadline = json.getString("deadline"),
+    completed = json.getBoolean("completed"),
+    completedOn = json.stringOrNull("completion_date"),
+)
+
+fun parseProject(json: JSONObject) = Project(
+    id = json.getInt("id"),
+    name = json.getString("name"),
+    value = json.getInt("value"),
+    deadline = json.getString("deadline"),
+    completed = json.getBoolean("completed"),
+    completedOn = json.stringOrNull("completion_date"),
+)
+
+fun parseSkill(json: JSONObject) = Skill(json.getInt("id"), json.getString("name"), json.getInt("level"), json.getInt("xp"))
+
 fun parseIncome(json: JSONObject) = Income(json.getInt("monthly_goal"), json.getInt("current_month_earnings"))
 
-fun parseDayLog(json: JSONObject) = DayLog(json.getJSONObject("auto"), json.getJSONObject("manual"), json.getJSONObject("merged"))
+fun parseDayLog(json: JSONObject) =
+    DayLog(json.getJSONObject("auto"), json.getJSONObject("manual"), json.getJSONObject("merged"), json.optString("date"))
+
+fun parseFieldCatalog(json: JSONObject) = FieldCatalog(
+    sections = json.getJSONArray("sections").map { it.getString("key") to it.getString("title") },
+    fields = json.getJSONArray("fields").map { f ->
+        val feeds = f.getJSONArray("feeds")
+        LogField(
+            f.getString("section"), f.getString("key"), f.getString("label"), f.getString("unit"),
+            f.getString("kind"), f.getString("source"), (0 until feeds.length()).map(feeds::getString),
+        )
+    },
+)

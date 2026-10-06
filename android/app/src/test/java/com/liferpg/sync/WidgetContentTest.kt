@@ -4,6 +4,7 @@ import androidx.compose.ui.unit.DpSize
 import androidx.glance.appwidget.testing.unit.runGlanceAppWidgetUnitTest
 import androidx.glance.testing.unit.hasText
 import androidx.glance.testing.unit.hasTextEqualTo
+import com.liferpg.sync.ui.categoryIcon
 import com.liferpg.sync.widget.LifeRpgWidget
 import com.liferpg.sync.widget.WidgetContent
 import com.liferpg.sync.widget.WidgetData
@@ -38,12 +39,18 @@ class WidgetContentTest {
     }
 
     @Test
-    fun largeListsEveryStreakAndStat() = runGlanceAppWidgetUnitTest {
+    fun largeListsEveryStreakCategoryAndStat() = runGlanceAppWidgetUnitTest {
         setAppWidgetSize(LifeRpgWidget.LARGE)
         provideComposable { WidgetContent(data) }
-        // Tiles read "<emoji> <name>"; stat rows are just the name ("Focus" is both a streak and a stat)
+        // Tiles read "<emoji> <name>"; category rows "<icon> <name>"; stat rows are just the name
+        // ("Focus" is both a streak and a stat). A one-stat category shows only its own row.
         streakNames.forEach { onNode(hasText("• $it")).assertExists() }
-        ScreenshotTest.SAMPLE_SHEET.stats.forEach { onNode(hasTextEqualTo(it.name)).assertExists() }
+        val sheet = ScreenshotTest.SAMPLE_SHEET
+        sheet.categories.forEach { category ->
+            onNode(hasTextEqualTo("${categoryIcon(category.key)} ${category.name}")).assertExists()
+            sheet.statsOf(category).takeIf { it.size > 1 }?.forEach { onNode(hasTextEqualTo(it.name)).assertExists() }
+        }
+        onNode(hasText("Weakest: ${categoryIcon("practical")} Practical 35")).assertExists()
         onNode(hasText("8,140 XP")).assertExists()
         onNode(hasText("960 XP to LV 13")).assertExists()
     }

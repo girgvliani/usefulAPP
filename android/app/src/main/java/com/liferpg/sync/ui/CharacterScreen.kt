@@ -1,6 +1,5 @@
 package com.liferpg.sync.ui
 
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -33,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.liferpg.sync.Api
+import com.liferpg.sync.Category
 import com.liferpg.sync.CharacterSheet
 import com.liferpg.sync.Level
 import com.liferpg.sync.Stat
@@ -44,16 +44,37 @@ fun CharacterScreen(api: Api) {
     val sheet = rememberLoader { api.character() to runCatching { api.profile().displayName }.getOrNull() }
     val levelState = LocalLevel.current
     val scope = rememberCoroutineScope()
+    // Character → category → stat; Back walks the same way
+    var openCategory by remember { mutableStateOf<String?>(null) }
+    var openStat by remember { mutableStateOf<String?>(null) }
     LoadView(sheet) { (data, name) ->
-        CharacterSheetView(data, name, levelState?.level, onRefresh = {
-            sheet.reload()
-            scope.launch { levelState?.refresh() }
-        })
+        val category = data.categories.firstOrNull { it.key == openCategory }
+        val stat = data.stats.firstOrNull { it.code == openStat }
+        when {
+            stat != null -> StatDetailScreen(api, stat, backLabel = category?.name ?: "Character", onBack = { openStat = null })
+            category != null -> CategoryScreen(api, data, category, onBack = { openCategory = null }, onOpenStat = { openStat = it.code })
+            else -> CharacterSheetView(
+                data, name, levelState?.level,
+                onOpen = { openStat = it.code },
+                onOpenCategory = { openCategory = it.key },
+                onRefresh = {
+                    sheet.reload()
+                    scope.launch { levelState?.refresh() }
+                },
+            )
+        }
     }
 }
 
 @Composable
-internal fun CharacterSheetView(sheet: CharacterSheet, name: String?, level: Level?, onRefresh: () -> Unit) {
+internal fun CharacterSheetView(
+    sheet: CharacterSheet,
+    name: String?,
+    level: Level?,
+    onOpen: (Stat) -> Unit = {},
+    onOpenCategory: (Category) -> Unit = {},
+    onRefresh: () -> Unit,
+) {
     Column(
         Modifier.verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -68,8 +89,14 @@ internal fun CharacterSheetView(sheet: CharacterSheet, name: String?, level: Lev
 
         level?.let { LevelHero(it) }
 
+        // A server from before the categories sends none: show the nine stats as before
+        val byCategory = sheet.categories.isNotEmpty()
         HudCard {
-            StatRadar(sheet.stats)
+            if (byCategory) CategoryRadar(sheet.categories, onSelect = onOpenCategory) else StatRadar(sheet.stats, onSelect = onOpen)
+            Text(
+                if (byCategory) "Tap a slice to open that category" else "Tap a slice to open that stat",
+                color = Rpg.Muted, fontSize = 12.sp, modifier = Modifier.align(Alignment.CenterHorizontally),
+            )
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -77,8 +104,13 @@ internal fun CharacterSheetView(sheet: CharacterSheet, name: String?, level: Lev
             RankLegend(Modifier.weight(1.3f))
         }
 
-        SectionTitle("Stats · tap for the breakdown")
-        sheet.stats.forEach { StatRow(it) }
+        if (byCategory) {
+            SectionTitle("Categories · tap one to open it")
+            sheet.categories.forEach { CategoryCard(it, sheet.statsOf(it), onOpenCategory, onOpen) }
+        } else {
+            SectionTitle("Stats · tap one for its full page")
+            sheet.stats.forEach { StatRow(it, onOpen) }
+        }
     }
 }
 
@@ -118,10 +150,9 @@ private fun RankLegend(modifier: Modifier) {
 }
 
 @Composable
-private fun StatRow(stat: Stat) {
-    var open by remember { mutableStateOf(false) }
+internal fun StatRow(stat: Stat, onOpen: (Stat) -> Unit) {
     val color = statColor(stat.code)
-    HudCard(Modifier.clickable { open = !open }.animateContentSize()) {
+    HudCard(Modifier.clickable { onOpen(stat) }) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Box(
                 Modifier.size(40.dp).border(2.dp, color, RoundedCornerShape(10.dp)),
@@ -139,17 +170,15 @@ private fun StatRow(stat: Stat) {
 
         if (stat.score == null) {
             Text(stat.components.firstOrNull()?.note ?: "No data yet", color = Rpg.Muted, fontSize = 13.sp)
-        } else if (!open && stat.bestMove != null) {
+        } else if (stat.bestMove != null) {
             Text("💡 ${stat.bestMove} (up to +${stat.bestMovePoints})", color = Rpg.Muted, fontSize = 13.sp)
         }
-
-        if (open) Breakdown(stat)
     }
 }
 
 /** Bar with a tick at the A edge, so S-tier scores visibly break past it. */
 @Composable
-private fun ScoreBar(score: Int?, color: androidx.compose.ui.graphics.Color) {
+internal fun ScoreBar(score: Int?, color: androidx.compose.ui.graphics.Color) {
     Box(Modifier.fillMaxWidth()) {
         Meter((score ?: 0) / 100f, color)
         Box(
@@ -158,31 +187,5 @@ private fun ScoreBar(score: Int?, color: androidx.compose.ui.graphics.Color) {
                 .height(6.dp),
             contentAlignment = Alignment.CenterEnd,
         ) { Box(Modifier.width(2.dp).height(10.dp).background(Rpg.Text.copy(alpha = 0.7f))) }
-    }
-}
-
-@Composable
-private fun Breakdown(stat: Stat) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        stat.components.forEach { c ->
-            Row {
-                Text(c.name, Modifier.weight(1f), fontSize = 13.sp)
-                Text(
-                    if (c.score == null) "—" else "%.1f / %.0f".format(c.score * c.weight, c.weight),
-                    fontSize = 13.sp,
-                    color = if (c.score == null) Rpg.Muted else Rpg.Text,
-                )
-            }
-            Text(c.note, color = Rpg.Muted, fontSize = 11.sp, modifier = Modifier.padding(bottom = 2.dp))
-        }
-        stat.penalties.forEach { p ->
-            Row {
-                Text("⚠ ${p.name}", Modifier.weight(1f), fontSize = 13.sp, color = Rpg.Bad)
-                Text("-%.0f".format(p.points), fontSize = 13.sp, color = Rpg.Bad)
-            }
-        }
-        stat.ceiling?.let { Text("🔒 Max $it today (${stat.ceilingNote})", fontSize = 12.sp, color = Rpg.Muted) }
-        if (stat.confidence < 100) Text("${100 - stat.confidence}% of this stat had no data yet", fontSize = 12.sp, color = Rpg.Muted)
-        stat.bestMove?.let { Text("💡 Biggest gain: $it (up to +${stat.bestMovePoints})", fontSize = 13.sp, color = Rpg.Accent) }
     }
 }
