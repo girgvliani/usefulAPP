@@ -22,6 +22,7 @@ class SharingIn(BaseModel):
     stats: bool | None = None
     streaks: bool | None = None
     goals: bool | None = None
+    leaderboard: bool | None = None  # on the global leaderboard
 
 
 def _person(db: Session, user: User) -> dict:
@@ -54,7 +55,7 @@ def update_sharing(payload: SharingIn, current_user: User = Depends(get_current_
     """Turn sharing on or off; it applies to all your friends at once."""
     profile = profiles.get_profile(db, current_user)
     for key, value in payload.model_dump(exclude_none=True).items():
-        setattr(profile, f"share_{key}", value)
+        setattr(profile, "on_leaderboard" if key == "leaderboard" else f"share_{key}", value)
     db.commit()
     return friends.sharing(db, current_user)
 
@@ -127,3 +128,10 @@ def leaderboard(current_user: User = Depends(get_current_user), db: Session = De
     rows = [{**friends.shared(db, current_user, everything=True, parts=parts), "me": True}]
     rows += [{**friends.shared(db, f, parts=parts), "me": False} for f in friends.friends_of(db, current_user)]
     return rows
+
+
+@router.get("/global")
+def global_leaderboard(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Everyone by level and XP (name, level, title, XP only): the top 50 and your own place.
+    You're on it unless you've hidden yourself (PATCH /friends/sharing {"leaderboard": false})."""
+    return friends.global_board(db, current_user)

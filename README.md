@@ -237,6 +237,7 @@ The backend in `backend/` stores daily logs and serves the same character sheet:
 | `GET /questionnaire/attempts` · `/attempts/{id}` | device or login | Every attempt, newest first (all are kept) |
 | `GET /friends` · `PATCH /friends/sharing` | device or login | Your friend code and sharing switches (level, stats, streaks, goals; all off until turned on, the same for every friend), your friends with only what each shares, and open requests |
 | `POST /friends/requests` · `/requests/{id}/accept` · `DELETE /requests/{id}` · `DELETE /friends/{user_id}` | device or login | Ask by code or email (asking someone who asked you makes you friends), accept, decline or take back, unfriend |
+| `GET /friends/global` | device or login | Everyone by level and XP (name, level, title, XP only): the top 50 and your own place. Everyone is on it unless they hide (`PATCH /friends/sharing {"leaderboard": false}`) |
 | `GET /friends/leaderboard` | device or login | You and your friends: level, XP this week, TOTAL, how TOTAL moved this week, the six categories (each only if shared) |
 | `GET /daily-logs/fields` | none | Every value a day can hold: label, unit, kind, usual source (phone / check-in) and the stats that read it |
 | `GET /stats/character?day=` | device or login | The six categories and all nine stats with breakdowns; TOTAL = average of the categories |

@@ -38,8 +38,32 @@ def name_of(db: Session, user: User) -> str:
 
 
 def sharing(db: Session, user: User) -> dict:
+    """The four friend switches, plus whether you're on the global leaderboard"""
     profile = profiles.get_profile(db, user)
-    return {key: getattr(profile, f"share_{key}") for key in SHARES}
+    return {**{key: getattr(profile, f"share_{key}") for key in SHARES}, "leaderboard": profile.on_leaderboard}
+
+
+GLOBAL_TOP = 50
+
+
+def global_board(db: Session, me: User) -> dict:
+    """Everyone on the global leaderboard by XP: name, level, title, XP. The top 50, plus your own place
+    when you're further down (or hidden: then only you see your row, unranked)."""
+    users = list(db.scalars(select(User).join(UserProfile, UserProfile.user_id == User.id).where(UserProfile.on_leaderboard)))
+    rows = []
+    for user in users:
+        summary = levels.summary(db, user)
+        rows.append({"id": user.id, "name": name_of(db, user), "level": summary["level"], "title": summary["title"],
+                     "xp": summary["xp"], "me": user.id == me.id})
+    rows.sort(key=lambda r: (-r["xp"], r["name"]))
+    for i, row in enumerate(rows):
+        row["rank"] = i + 1
+    mine = next((r for r in rows if r["me"]), None)
+    if mine is None:  # hidden: show you where you'd be, without a rank
+        summary = levels.summary(db, me)
+        mine = {"id": me.id, "name": name_of(db, me), "level": summary["level"], "title": summary["title"],
+                "xp": summary["xp"], "me": True, "rank": None}
+    return {"players": len(rows), "top": rows[:GLOBAL_TOP], "you": mine}
 
 
 def friendship(db: Session, a: User, b: User) -> Friendship | None:

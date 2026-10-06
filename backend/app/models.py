@@ -231,6 +231,8 @@ class UserProfile(Base):
     share_stats: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
     share_streaks: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
     share_goals: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
+    # The global leaderboard (name, level, title, XP): everyone is on it unless they hide
+    on_leaderboard: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
 
 
 class Friendship(Base):
