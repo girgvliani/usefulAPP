@@ -235,6 +235,9 @@ The backend in `backend/` stores daily logs and serves the same character sheet:
 | `GET /daily-logs?start=&end=` · `GET /daily-logs/{day}` | device or login | Raw `auto`, `manual` and `merged` data |
 | `GET /questionnaire` · `POST /questionnaire` | device or login | The questions (rendered by both apps), answers to start from, and the latest results; posting saves an attempt and returns priorities, focus areas and a plan. Birth year, sex and height go into the profile, weight into today's log |
 | `GET /questionnaire/attempts` · `/attempts/{id}` | device or login | Every attempt, newest first (all are kept) |
+| `GET /friends` · `PATCH /friends/sharing` | device or login | Your friend code and sharing switches (level, stats, streaks, goals; all off until turned on, the same for every friend), your friends with only what each shares, and open requests |
+| `POST /friends/requests` · `/requests/{id}/accept` · `DELETE /requests/{id}` · `DELETE /friends/{user_id}` | device or login | Ask by code or email (asking someone who asked you makes you friends), accept, decline or take back, unfriend |
+| `GET /friends/leaderboard` | device or login | You and your friends: level, XP this week, TOTAL, how TOTAL moved this week, the six categories (each only if shared) |
 | `GET /daily-logs/fields` | none | Every value a day can hold: label, unit, kind, usual source (phone / check-in) and the stats that read it |
 | `GET /stats/character?day=` | device or login | The six categories and all nine stats with breakdowns; TOTAL = average of the categories |
 | `GET /stats/character/history?start=&end=` | device or login | Stat and category scores per day (up to 92 days), for charts |

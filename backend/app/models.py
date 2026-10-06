@@ -225,6 +225,25 @@ class UserProfile(Base):
     height_cm: Mapped[float | None] = mapped_column(Float, nullable=True)
     birth_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
     sex: Mapped[str | None] = mapped_column(String(6), nullable=True)  # "male" / "female"
+    # Friends: a code to share, and what friends may see (all off until the user turns it on)
+    friend_code: Mapped[str | None] = mapped_column(String(12), unique=True, nullable=True)
+    share_level: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
+    share_stats: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
+    share_streaks: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
+    share_goals: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
+
+
+class Friendship(Base):
+    """A friend request, and once accepted, a friendship. One row per pair, either direction."""
+    __tablename__ = "friendships"
+    __table_args__ = (UniqueConstraint("requester_id", "addressee_id", name="uq_friendship_pair"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    requester_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    addressee_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    status: Mapped[str] = mapped_column(String(10), nullable=False, default="pending")  # pending / accepted
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class Goal(Base):
