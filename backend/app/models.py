@@ -231,6 +231,11 @@ class UserProfile(Base):
     share_stats: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
     share_streaks: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
     share_goals: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
+    # How others (friends, the global leaderboard) see you: "name", "nickname" or "code"
+    nickname: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    public_name: Mapped[str] = mapped_column(String(10), nullable=False, default="nickname", server_default="nickname")
+    # Dave Ramsey's Baby Steps: the numbers the user enters (services/baby_steps.py)
+    baby_steps: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict, server_default="{}")
     # Customization unlocked by level: {"off": {"MP": ["Meditation"]}, ...}
     customization: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict, server_default="{}")
     # Chrome history import: site -> category the user chose ("localhost:3000" -> "work")

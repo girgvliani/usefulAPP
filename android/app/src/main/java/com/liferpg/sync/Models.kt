@@ -63,6 +63,8 @@ data class Profile(
     val heightCm: Double?,
     val birthYear: Int?,
     val sex: String?,
+    val nickname: String? = null,
+    val publicName: String = "nickname",  // what friends and the leaderboard see: name / nickname / code
 )
 
 data class MealItem(val name: String, val grams: Double?, val kcal: Double, val protein: Double, val carbs: Double, val fat: Double)
@@ -240,6 +242,8 @@ fun parseGoals(json: JSONArray) = json.map(::parseGoal)
 
 fun parseProfile(json: JSONObject) = Profile(
     displayName = json.stringOrNull("display_name"),
+    nickname = if (json.has("nickname")) json.stringOrNull("nickname") else null,
+    publicName = json.optString("public_name", "nickname"),
     currency = json.getString("currency"),
     timezone = json.getString("timezone"),
     pushupTarget = json.getInt("pushup_target"),
@@ -562,3 +566,34 @@ fun parseCustomization(json: JSONObject): Customization {
 }
 
 fun parseTip(json: JSONObject) = Tip(json.getString("when"), json.getString("title"), json.getString("detail"))
+
+// ---- Dave Ramsey's Baby Steps
+
+/** progress: 0-1, or null when it needs numbers; applies = false for a step that doesn't (no kids, renting) */
+data class BabyStep(
+    val step: Int,
+    val title: String,
+    val detail: String,
+    val progress: Double?,
+    val applies: Boolean,
+    val done: Boolean,
+    val current: Boolean,
+    val note: String,
+)
+
+data class BabySteps(val currency: String, val current: Int?, val score: Double?, val steps: List<BabyStep>, val plan: JSONObject)
+
+fun parseBabySteps(json: JSONObject) = BabySteps(
+    currency = json.getString("currency"),
+    current = if (json.isNull("current")) null else json.getInt("current"),
+    score = if (json.isNull("score")) null else json.getDouble("score"),
+    steps = json.getJSONArray("steps").map { s ->
+        val progress = s.opt("progress")
+        BabyStep(
+            s.getInt("step"), s.getString("title"), s.getString("detail"),
+            (progress as? Number)?.toDouble(), progress != "n/a",
+            s.getBoolean("done"), s.getBoolean("current"), s.getString("note"),
+        )
+    },
+    plan = json.getJSONObject("plan"),
+)

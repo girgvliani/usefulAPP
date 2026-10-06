@@ -104,6 +104,12 @@ class Api(private val settings: Settings) {
     /** You (everything) and your friends (what they share) */
     suspend fun leaderboard(): List<FriendView> = list("/friends/leaderboard", ::parseFriendView)
 
+    // ---- Dave Ramsey's Baby Steps
+
+    suspend fun babySteps(): BabySteps = parseBabySteps(JSONObject(call("GET", "/money/baby-steps")!!))
+
+    suspend fun saveBabySteps(body: JSONObject): BabySteps = parseBabySteps(JSONObject(call("PUT", "/money/baby-steps", body)!!))
+
     // ---- Customization and tips
 
     suspend fun customization(): Customization = parseCustomization(JSONObject(call("GET", "/customize")!!))

@@ -239,6 +239,7 @@ The backend in `backend/` stores daily logs and serves the same character sheet:
 | `POST /friends/requests` · `/requests/{id}/accept` · `DELETE /requests/{id}` · `DELETE /friends/{user_id}` | device or login | Ask by code or email (asking someone who asked you makes you friends), accept, decline or take back, unfriend |
 | `GET /customize` · `PUT /customize/off` · `DELETE /customize` | device or login | Customization earned by level: the unlock ladder (LV 7 turn parts off, 15 weights, 20 personal targets, 25 move stats, 30 check-in questions, 40 own stats, then 50 … 1000 Genius), and turning a stat's parts off (LV 7+; at least one part stays on). Only your own views use it; friends and leaderboards see standard stats |
 | `GET /stats/tip?when=morning\|evening` | device or login | The daily tip: morning = the biggest gain available today (leaning toward the categories you ranked highest), evening = what's still open before midnight |
+| `GET /money/baby-steps` · `PUT /money/baby-steps` | device or login | Dave Ramsey's 7 Baby Steps: your numbers (emergency fund, debts for the snowball, % invested, kids/college, home/mortgage, giving), each step's progress and the step you're on. A PUT merges what you send. Counted in order, they are half of Wealth (the income goal is the other half) |
 | `GET /browsing/groups` · `PUT /browsing/groups` | device or login | Your site groups for the Chrome import ("localhost:3000" → work); a PUT merges into what's saved. Daily totals arrive through `POST /daily-logs/batch` as the `browser` section |
 | `GET /friends/global` | device or login | Everyone by level and XP (name, level, title, XP only): the top 50 and your own place. Everyone is on it unless they hide (`PATCH /friends/sharing {"leaderboard": false}`) |
 | `GET /friends/leaderboard` | device or login | You and your friends: level, XP this week, TOTAL, how TOTAL moved this week, the six categories (each only if shared) |
@@ -250,7 +251,7 @@ Everything else the app can manage (device or login token):
 
 | Resource | Endpoints |
 |----------|-----------|
-| Profile | `GET /profile` · `PATCH /profile`: currency, timezone, daily push-up / step targets, sleep target (sets MP's sleep debt). The stat formulas are shared; these targets are personal |
+| Profile | `GET /profile` · `PATCH /profile`: nickname and `public_name` (what friends and the leaderboard see: `nickname` by default, `name`, or `code`), currency, timezone, daily push-up / step targets, sleep target (sets MP's sleep debt). The stat formulas are shared; these targets are personal |
 | Goals | `GET/POST /goals` · `GET/PATCH/DELETE /goals/{id}`. Types `weight`, `max_pushups`, `steps`, `sleep`, `income` read their current value from your logs; `custom` takes it by hand. Progress = (current − start) ÷ (target − start), so losing 95→85 kg and gaining 70→80 kg work the same way |
 | Todos | `GET/POST /todos` · `GET/PATCH/DELETE /todos/{id}` · `POST /todos/{id}/complete` |
 | Projects | `GET/POST /projects` · `GET/PATCH/DELETE /projects/{id}` · `POST /projects/{id}/complete` (editing or deleting a completed project corrects this month's income) |

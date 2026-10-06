@@ -22,6 +22,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.liferpg.sync.Api
+import com.liferpg.sync.BabySteps
 import com.liferpg.sync.Goal
 import com.liferpg.sync.Milestone
 import com.liferpg.sync.Project
@@ -37,6 +38,7 @@ data class PlanData(
     val quests: List<Quest>,
     val projects: List<Project>,
     val skills: List<Skill>,
+    val babySteps: BabySteps? = null,  // null if it couldn't load; the card then just opens the page
 )
 
 /** One page with everything you're working toward; each card opens its full list. */
@@ -49,7 +51,8 @@ fun PlanScreen(api: Api, onOpen: (Dest) -> Unit) {
             val quests = async { api.quests() }
             val projects = async { api.projects() }
             val skills = async { api.skills() }
-            PlanData(goals.await(), milestones.await(), quests.await(), projects.await(), skills.await())
+            val babySteps = async { runCatching { api.babySteps() }.getOrNull() }
+            PlanData(goals.await(), milestones.await(), quests.await(), projects.await(), skills.await(), babySteps.await())
         }
     }
     var goalPreset by remember { mutableStateOf<GoalPreset?>(null) }
@@ -126,6 +129,14 @@ internal fun PlanOverview(
                 Meter(skill.progress, Rpg.AccentDeep)
             }
         }
+
+        val steps = data.babySteps
+        PlanCard(Dest.BabySteps, babyStepsSummary(steps), onOpen) {
+            steps?.steps?.firstOrNull { it.current }?.let { s ->
+                PreviewRow(s.title, s.note)
+                if (s.applies) Meter((s.progress ?: 0.0).toFloat(), Rpg.Accent)
+            }
+        }
     }
 }
 
@@ -150,4 +161,10 @@ private fun PreviewRow(text: String, value: String) {
         Text(text, Modifier.weight(1f), fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(value, color = Rpg.Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 8.dp))
     }
+}
+
+internal fun babyStepsSummary(steps: BabySteps?) = when {
+    steps == null || steps.score == null -> "Dave Ramsey's 7 steps: fill in your numbers"
+    steps.current == null -> "All 7 steps done"
+    else -> "On step ${steps.current} of 7"
 }

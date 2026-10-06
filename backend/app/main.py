@@ -9,7 +9,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from app.config import settings
 from app.rate_limit import limiter
 from app.routers import (
-    auth, browsing, customize, daily_logs, devices, friends, goals, habits, income, life_areas, meals, milestones, profile, projects, questionnaire,
+    auth, browsing, customize, daily_logs, devices, friends, goals, money, habits, income, life_areas, meals, milestones, profile, projects, questionnaire,
     screen_time, sleep, social, stats, todos, xp,
 )
 
@@ -65,6 +65,7 @@ app.include_router(questionnaire.router)
 app.include_router(friends.router)
 app.include_router(browsing.router)
 app.include_router(customize.router)
+app.include_router(money.router)
 
 
 @app.get("/health")

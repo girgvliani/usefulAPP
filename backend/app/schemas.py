@@ -404,6 +404,8 @@ class CharacterDay(BaseModel):
 class ProfileOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     display_name: str | None
+    nickname: str | None = None
+    public_name: Literal["name", "nickname", "code"] = "nickname"  # what friends and the leaderboard see
     currency: str
     timezone: str
     pushup_target: int
@@ -416,6 +418,8 @@ class ProfileOut(BaseModel):
 
 class ProfileUpdate(BaseModel):
     display_name: str | None = Field(default=None, min_length=1, max_length=100)
+    nickname: str | None = Field(default=None, min_length=1, max_length=40)
+    public_name: Literal["name", "nickname", "code"] | None = None
     currency: str | None = Field(default=None, pattern=r"^[A-Z]{3}$")  # ISO code, e.g. GEL, USD, EUR
     timezone: str | None = Field(default=None, max_length=64)
     pushup_target: int | None = Field(default=None, ge=1, le=1000)

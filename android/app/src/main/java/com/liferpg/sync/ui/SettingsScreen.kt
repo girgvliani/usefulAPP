@@ -276,6 +276,8 @@ private fun ProfileCard(api: Api) {
 private fun ProfileForm(api: Api, profile: Profile, income: Income, onSaved: () -> Unit) {
     val scope = rememberCoroutineScope()
     var name by remember(profile) { mutableStateOf(profile.displayName.orEmpty()) }
+    var nickname by remember(profile) { mutableStateOf(profile.nickname.orEmpty()) }
+    var publicName by remember(profile) { mutableStateOf(profile.publicName) }
     var currency by remember(profile) { mutableStateOf(profile.currency) }
     var pushups by remember(profile) { mutableStateOf(profile.pushupTarget.toString()) }
     var steps by remember(profile) { mutableStateOf(profile.stepsTarget.toString()) }
@@ -290,6 +292,9 @@ private fun ProfileForm(api: Api, profile: Profile, income: Income, onSaved: () 
     HudCard {
         SectionTitle("Your profile · the formulas are shared, these targets are yours")
         OutlinedTextField(name, { name = it }, label = { Text("Name on your card") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(nickname, { nickname = it.take(40) }, label = { Text("Nickname") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        Text("Friends and the leaderboard see you as", color = Rpg.Muted, fontSize = 12.sp)
+        ChoiceChips(listOf("nickname" to "Nickname", "name" to "Your name", "code" to "Just your code"), publicName) { publicName = it }
         OutlinedTextField(currency, { currency = it.uppercase().take(3) }, label = { Text("Currency (GEL, USD, EUR…)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         NumberInput(pushups, { pushups = it }, "Daily push-up target")
         NumberInput(steps, { steps = it }, "Daily step target")
@@ -317,6 +322,8 @@ private fun ProfileForm(api: Api, profile: Profile, income: Income, onSaved: () 
                             .put("steps_target", steps.toIntOrNull() ?: error("Step target: whole number"))
                             .put("sleep_target", sleep.replace(',', '.').toDoubleOrNull() ?: error("Sleep target: a number"))
                         if (name.isNotBlank()) body.put("display_name", name.trim())
+                        if (nickname.isNotBlank()) body.put("nickname", nickname.trim())
+                        body.put("public_name", publicName)
                         if (height.isNotBlank()) body.put("height_cm", height.toDoubleOrNull() ?: error("Height: a number in cm"))
                         if (birthYear.isNotBlank()) body.put("birth_year", birthYear.toIntOrNull() ?: error("Birth year: e.g. 2001"))
                         sex?.let { body.put("sex", it) }

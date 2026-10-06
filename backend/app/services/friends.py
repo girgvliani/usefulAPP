@@ -33,8 +33,10 @@ def friend_code(db: Session, user: User) -> str:
 
 
 def name_of(db: Session, user: User) -> str:
+    """What others see, as the user chose: their name, their nickname, or just their friend code"""
     profile = profiles.get_profile(db, user)
-    return profile.display_name or f"Player {friend_code(db, user)}"
+    chosen = {"name": profile.display_name, "nickname": profile.nickname}.get(profile.public_name)
+    return chosen or f"Player {friend_code(db, user)}"
 
 
 def sharing(db: Session, user: User) -> dict:

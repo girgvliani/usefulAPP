@@ -451,12 +451,16 @@ def social(data, day):
 
 
 def wealth(data):
-    """WLT: this month's earnings against the monthly goal"""
+    """WLT: this month's earnings against the monthly goal, and progress through Dave Ramsey's Baby Steps
+    (counted in order; see services/baby_steps.py)"""
     income = data['income']
     goal, earned = income['monthly_goal'], income['current_month_earnings']
     currency = income.get('currency', 'Lari')
+    steps = data.get('baby_steps') or {}
     return combine([
-        component('Monthly income goal', 100, min(1, earned / goal) if goal else None, f'{earned:,} / {goal:,} {currency}'),
+        component('Monthly income goal', 50, min(1, earned / goal) if goal else None, f'{earned:,} / {goal:,} {currency}'),
+        component('Baby Steps', 50, steps.get('score'),
+                  f"on step {steps['current']} of 7" if steps.get('current') else 'all 7 done', 'fill in your Baby Steps'),
     ])
 
 
