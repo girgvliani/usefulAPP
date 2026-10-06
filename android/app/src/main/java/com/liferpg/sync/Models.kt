@@ -354,3 +354,85 @@ fun parseFieldCatalog(json: JSONObject) = FieldCatalog(
         )
     },
 )
+
+// ---- Questionnaire (questions come from the server, so both apps ask the same thing)
+
+/** kind: single / multi / scale / number / rank / text */
+data class QQuestion(
+    val id: String,
+    val text: String,
+    val kind: String,
+    val options: List<Pair<String, String>>,
+    val optional: Boolean,
+    val max: Int?,
+    val min: Int?,
+    val unit: String,
+    val minLabel: String,
+    val maxLabel: String,
+)
+
+data class QSection(val key: String, val title: String, val intro: String, val questions: List<QQuestion>)
+
+data class PlanStep(
+    val id: String,
+    val category: String,
+    val categoryName: String,
+    val title: String,
+    val why: String,
+    val firstStep: String,
+    val goal: JSONObject?,  // a goal to create in one tap, as /goals takes it
+)
+
+data class Priority(val key: String, val name: String, val level: Int, val tracked: Boolean)
+
+data class QResults(val priorities: List<Priority>, val focus: List<String>, val plan: List<PlanStep>, val tips: List<String>)
+
+data class Attempt(val id: Int, val createdAt: String, val answers: JSONObject, val results: QResults)
+
+data class Questionnaire(val sections: List<QSection>, val prefill: JSONObject, val latest: Attempt?)
+
+private fun JSONArray.strings() = (0 until length()).map(::getString)
+
+fun parseAttempt(json: JSONObject): Attempt {
+    val r = json.getJSONObject("results")
+    return Attempt(
+        id = json.getInt("id"),
+        createdAt = json.getString("created_at"),
+        answers = json.getJSONObject("answers"),
+        results = QResults(
+            priorities = r.getJSONArray("priorities").map { Priority(it.getString("key"), it.getString("name"), it.getInt("level"), it.getBoolean("tracked")) },
+            focus = r.getJSONArray("focus").strings(),
+            plan = r.getJSONArray("plan").map {
+                PlanStep(
+                    it.getString("id"), it.getString("category"), it.getString("category_name"), it.getString("title"),
+                    it.getString("why"), it.getString("first_step"), it.optJSONObject("goal"),
+                )
+            },
+            tips = r.getJSONArray("tips").strings(),
+        ),
+    )
+}
+
+fun parseQuestionnaire(json: JSONObject) = Questionnaire(
+    sections = json.getJSONArray("sections").map { s ->
+        QSection(
+            s.getString("key"), s.getString("title"), s.optString("intro"),
+            s.getJSONArray("questions").map { q ->
+                QQuestion(
+                    id = q.getString("id"),
+                    text = q.getString("text"),
+                    kind = q.getString("kind"),
+                    options = q.optJSONArray("options")?.map { it.getString("value") to it.getString("label") }.orEmpty(),
+                    optional = q.optBoolean("optional"),
+                    max = if (q.has("max")) q.getInt("max") else null,
+                    min = if (q.has("min")) q.getInt("min") else null,
+                    unit = q.optString("unit"),
+                    minLabel = q.optString("min_label"),
+                    maxLabel = q.optString("max_label"),
+                )
+            },
+        )
+    },
+    prefill = json.optJSONObject("prefill") ?: JSONObject(),
+    latest = json.optJSONObject("latest")?.let(::parseAttempt),
+)

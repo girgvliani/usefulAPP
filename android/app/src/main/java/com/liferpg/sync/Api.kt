@@ -60,6 +60,16 @@ class Api(private val settings: Settings) {
         call("DELETE", "/daily-logs/$date?source=$source&section=$section&field=$field")
     }
 
+    /** The questions, answers to start from, and your latest results */
+    suspend fun questionnaire(): Questionnaire = parseQuestionnaire(JSONObject(call("GET", "/questionnaire")!!))
+
+    /** Saves an attempt (every one is kept) and returns your priorities, focus areas and plan */
+    suspend fun submitQuestionnaire(answers: JSONObject): Attempt =
+        parseAttempt(JSONObject(call("POST", "/questionnaire", JSONObject().put("answers", answers))!!))
+
+    /** Every attempt, newest first */
+    suspend fun attempts(): List<Attempt> = list("/questionnaire/attempts", ::parseAttempt)
+
     /** Drop one check-in value so the phone's value shows through again */
     suspend fun clearManual(date: LocalDate, section: String, field: String) {
         call("DELETE", "/daily-logs/$date?source=manual&section=$section&field=$field")

@@ -142,7 +142,7 @@ fun LifeRpgApp(sharedPhoto: Uri? = null, onSharedPhotoUsed: () -> Unit = {}) {
                 Box(Modifier.padding(padding).fillMaxSize()) {
                     key(connection, current) {
                         when (current) {
-                            Dest.Character -> CharacterScreen(api)
+                            Dest.Character -> CharacterScreen(api, onOpen = { open(it) })
                             Dest.CheckIn -> CheckInScreen(api)
                             Dest.Meals -> MealsScreen(api, sharedPhoto, onSharedPhotoUsed)
                             Dest.Plan -> PlanScreen(api, onOpen = { open(it) })
@@ -151,6 +151,7 @@ fun LifeRpgApp(sharedPhoto: Uri? = null, onSharedPhotoUsed: () -> Unit = {}) {
                             Dest.Quests -> QuestsScreen(api)
                             Dest.Projects -> ProjectsScreen(api)
                             Dest.Skills -> SkillsScreen(api)
+                            Dest.Questionnaire -> QuestionnaireScreen(api, onOpen = { open(it) })
                             Dest.About -> AboutScreen(api, onOpen = { open(it) })
                             Dest.Profile -> ProfileScreen(api)
                             Dest.Settings -> SettingsScreen(settings, api, onConnected = { connection++ })

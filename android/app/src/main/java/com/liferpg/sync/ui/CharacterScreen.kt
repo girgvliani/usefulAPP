@@ -39,9 +39,11 @@ import com.liferpg.sync.Stat
 import kotlinx.coroutines.launch
 
 @Composable
-fun CharacterScreen(api: Api) {
+fun CharacterScreen(api: Api, onOpen: (Dest) -> Unit = {}) {
     // The name on the card comes from the profile; the sheet still shows if that call fails
     val sheet = rememberLoader { api.character() to runCatching { api.profile().displayName }.getOrNull() }
+    // Until you've taken the questionnaire, the Character screen asks you to (null: couldn't tell)
+    val taken = rememberLoader { runCatching { api.attempts().isNotEmpty() }.getOrNull() }
     val levelState = LocalLevel.current
     val scope = rememberCoroutineScope()
     // Character → category → stat; Back walks the same way
@@ -55,6 +57,8 @@ fun CharacterScreen(api: Api) {
             category != null -> CategoryScreen(api, data, category, onBack = { openCategory = null }, onOpenStat = { openStat = it.code })
             else -> CharacterSheetView(
                 data, name, levelState?.level,
+                askQuestionnaire = (taken.value as? Load.Ready)?.value == false,
+                onQuestionnaire = { onOpen(Dest.Questionnaire) },
                 onOpen = { openStat = it.code },
                 onOpenCategory = { openCategory = it.key },
                 onRefresh = {
@@ -73,6 +77,8 @@ internal fun CharacterSheetView(
     level: Level?,
     onOpen: (Stat) -> Unit = {},
     onOpenCategory: (Category) -> Unit = {},
+    askQuestionnaire: Boolean = false,
+    onQuestionnaire: () -> Unit = {},
     onRefresh: () -> Unit,
 ) {
     Column(
@@ -85,6 +91,14 @@ internal fun CharacterSheetView(
                 Text(sheet.date, color = Rpg.Muted, fontSize = 13.sp)
             }
             TextButton(onClick = onRefresh) { Text("↻ Refresh") }
+        }
+
+        if (askQuestionnaire) {
+            HudCard(Modifier.clickable(onClick = onQuestionnaire)) {
+                Text("🧭 Take the questionnaire", fontWeight = FontWeight.Black, fontSize = 17.sp)
+                Text("5 minutes on what matters to you and how you live now, for a plan of what to change first.", color = Rpg.Muted, fontSize = 13.sp)
+                Text("Start ›", color = Rpg.Accent, fontWeight = FontWeight.Bold)
+            }
         }
 
         level?.let { LevelHero(it) }
