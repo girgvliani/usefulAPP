@@ -13,6 +13,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.sp
@@ -43,6 +44,7 @@ internal fun questXp(quest: Quest, today: LocalDate = LocalDate.now()): Int {
 fun QuestsScreen(api: Api) {
     val levelState = LocalLevel.current
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val data = rememberLoader { coroutineScope { val q = async { api.quests() }; val s = async { api.skills() }; q.await() to s.await() } }
     var editing by remember { mutableStateOf<Quest?>(null) }
     var creating by remember { mutableStateOf(false) }
@@ -53,13 +55,13 @@ fun QuestsScreen(api: Api) {
             onAdd = { creating = true },
             onComplete = { quest ->
                 scope.launch {
-                    runCatching { api.completeQuest(quest.id) }
+                    runCatching { api.completeQuest(quest.id) }.onFailure { failed(context, "complete the quest", it) }
                     data.reload()
                     levelState?.refresh()
                 }
             },
             onEdit = { editing = it },
-            onDelete = { quest -> scope.launch { runCatching { api.deleteQuest(quest.id) }; data.reload() } },
+            onDelete = { quest -> scope.launch { runCatching { api.deleteQuest(quest.id) }.onFailure { failed(context, "delete the quest", it) }; data.reload() } },
         )
         if (creating) QuestDialog(null, skills, onSave = { body -> api.createQuest(body); creating = false; data.reload() }, onDismiss = { creating = false })
         editing?.let { quest ->

@@ -13,6 +13,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.sp
@@ -37,6 +38,7 @@ fun MilestonesScreen(api: Api) {
     val levelState = LocalLevel.current
     val scope = rememberCoroutineScope()
     val milestones = rememberLoader { api.milestones() }
+    val context = LocalContext.current
     var editing by remember { mutableStateOf<Milestone?>(null) }
     var creating by remember { mutableStateOf<Pair<String, Int>?>(null) }
     var showDone by remember { mutableStateOf(false) }
@@ -60,13 +62,13 @@ fun MilestonesScreen(api: Api) {
                     milestone,
                     onComplete = {
                         scope.launch {
-                            runCatching { api.completeMilestone(milestone.key) }
+                            runCatching { api.completeMilestone(milestone.key) }.onFailure { failed(context, "complete the milestone", it) }
                             milestones.reload()
                             levelState?.refresh()
                         }
                     },
                     onEdit = { editing = milestone },
-                    onDelete = { scope.launch { runCatching { api.deleteMilestone(milestone.key) }; milestones.reload() } },
+                    onDelete = { scope.launch { runCatching { api.deleteMilestone(milestone.key) }.onFailure { failed(context, "delete the milestone", it) }; milestones.reload() } },
                 )
             }
         }

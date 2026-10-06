@@ -196,3 +196,8 @@ internal fun relative(date: LocalDate, today: LocalDate = LocalDate.now()): Stri
         else -> "${-days} days late"
     }
 }
+
+/** Says what didn't work, instead of a button that seems to do nothing */
+internal fun failed(context: android.content.Context, action: String, error: Throwable) {
+    android.widget.Toast.makeText(context, "Couldn't $action: ${error.message ?: "something went wrong"}", android.widget.Toast.LENGTH_LONG).show()
+}

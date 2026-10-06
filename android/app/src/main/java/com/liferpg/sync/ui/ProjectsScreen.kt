@@ -13,6 +13,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.sp
@@ -28,6 +29,7 @@ import java.time.LocalDate
 fun ProjectsScreen(api: Api) {
     val levelState = LocalLevel.current
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val data = rememberLoader {
         coroutineScope { val p = async { api.projects() }; val c = async { api.profile().currency }; p.await() to c.await() }
     }
@@ -50,13 +52,13 @@ fun ProjectsScreen(api: Api) {
                     project, currency,
                     onComplete = {
                         scope.launch {
-                            runCatching { api.completeProject(project.id) }
+                            runCatching { api.completeProject(project.id) }.onFailure { failed(context, "complete the project", it) }
                             data.reload()
                             levelState?.refresh()
                         }
                     },
                     onEdit = { editing = project },
-                    onDelete = { scope.launch { runCatching { api.deleteProject(project.id) }; data.reload() } },
+                    onDelete = { scope.launch { runCatching { api.deleteProject(project.id) }.onFailure { failed(context, "delete the project", it) }; data.reload() } },
                 )
             }
         }

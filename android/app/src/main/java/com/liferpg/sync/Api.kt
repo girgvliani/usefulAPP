@@ -212,11 +212,10 @@ class Api(private val settings: Settings) {
     }
 
     private suspend fun send(method: String, path: String, body: JSONObject?, bearer: String?): String? = withContext(Dispatchers.IO) {
-        val requestBody = body?.toString()?.toRequestBody(JSON)
         val request = Request.Builder()
             .url(settings.serverUrl + path)
             .apply { if (bearer != null) header("Authorization", "Bearer $bearer") }
-            .method(method, requestBody)
+            .method(method, requestBody(method, body))
             .build()
         client.newCall(request).execute().use { response ->
             val text = response.body.string()
@@ -236,6 +235,16 @@ class Api(private val settings: Settings) {
 
     companion object {
         private val JSON = "application/json".toMediaType()
+
+        /**
+         * OkHttp refuses a POST, PUT or PATCH without a body, so actions that send nothing
+         * (completing a quest, milestone or project) get an empty one instead of failing.
+         */
+        internal fun requestBody(method: String, body: JSONObject?) = when {
+            body != null -> body.toString().toRequestBody(JSON)
+            method in setOf("POST", "PUT", "PATCH") -> ByteArray(0).toRequestBody(null)
+            else -> null
+        }
         private val client = OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)
