@@ -9,7 +9,6 @@ SECTIONS = [
     ('screen', 'Phone use'),
     ('body', 'Body'),
     ('social', 'Social'),
-    ('browser', 'Browsing (Chrome import)'),
 ]
 
 # kind: decimal / whole / yesno / time (HH:MM). source: phone (synced), checkin (typed in), both, import (a file you upload).
@@ -52,16 +51,6 @@ FIELDS = [
     ('body', 'cam_best_set', 'Best camera-counted push-up set', '', 'whole', 'phone', []),
     ('social', 'interactions', 'Meaningful contacts (30+ min)', '', 'whole', 'checkin', ['SOC']),
     # Estimates from an imported Chrome history; a report for now, no stat reads them
-    ('browser', 'work_min', 'Work', 'min', 'whole', 'import', []),
-    ('browser', 'learning_min', 'Learning', 'min', 'whole', 'import', []),
-    ('browser', 'social_min', 'Social sites', 'min', 'whole', 'import', []),
-    ('browser', 'entertainment_min', 'Entertainment', 'min', 'whole', 'import', []),
-    ('browser', 'shopping_min', 'Shopping', 'min', 'whole', 'import', []),
-    ('browser', 'news_min', 'News', 'min', 'whole', 'import', []),
-    ('browser', 'other_min', 'Other sites', 'min', 'whole', 'import', []),
-    ('browser', 'visits', 'Pages visited', '', 'whole', 'import', []),
-    ('browser', 'searches', 'Google searches', '', 'whole', 'import', []),
-    ('browser', 'shorts', 'YouTube Shorts opened', '', 'whole', 'import', []),
 ]
 
 

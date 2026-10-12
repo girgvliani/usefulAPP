@@ -13,7 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import Goal, LifeArea, User
-from app.services import daily_logs, goals, profiles
+from app.services import daily_logs, fasting, goals, profiles
 from app.services.character_stats import calorie_ok
 
 GOAL_XP = 250
@@ -36,8 +36,8 @@ def level_for(xp: float) -> int:
     return floor((sqrt(1 + 4 * xp / LEVEL_STEP) - 1) / 2)
 
 
-def day_xp(entry: dict, meals: dict | None, targets: dict) -> list[tuple[str, int]]:
-    """(reason, XP) for one day's logs and meals."""
+def day_xp(entry: dict, meals: dict | None, targets: dict, fasts: list[dict] = ()) -> list[tuple[str, int]]:
+    """(reason, XP) for one day's logs, meals and fasts."""
     def get(section, key):
         return entry.get(section, {}).get(key)
 
@@ -68,6 +68,8 @@ def day_xp(entry: dict, meals: dict | None, targets: dict) -> list[tuple[str, in
         earned.append(("Meals logged", 5 * min(3, meals['count'])))
         if meals['count'] >= 3 and calorie_ok(meals['kcal'], targets['calories']):
             earned.append(("Within calories", 15))
+    for f in fasts:
+        earned.append((f"Fasted {f['hours']:.0f}h", fasting.fast_xp(f['hours'], f['completed'])))
     return [(reason, xp) for reason, xp in earned if xp > 0]
 
 
@@ -86,12 +88,31 @@ def summary(db: Session, user: User) -> dict:
     activity = 0
     per_day: dict[str, int] = {}
     today_items: list[tuple[str, int]] = []
-    for day in sorted(set(days) | set(meals)):
-        items = day_xp(days.get(day, {}), meals.get(day), targets)
+    fasts: dict[str, list] = {}
+    for f in fasting.summaries(db, user, date(2000, 1, 1)):
+        fasts.setdefault(f['day'], []).append(f)
+    for day in sorted(set(days) | set(meals) | set(fasts)):
+        items = day_xp(days.get(day, {}), meals.get(day), targets, fasts.get(day, []))
         per_day[day] = sum(xp for _, xp in items)
         activity += per_day[day]
         if day == today.isoformat():
             today_items = items
+    # Paths: daily and weekly targets hit on each path, and its story chapters (services/paths.py)
+    from app.services import paths
+    path_info = paths.summary(db, user, days)
+    for day, items in path_info['by_day'].items():
+        per_day[day] = per_day.get(day, 0) + sum(xp for _, xp in items)
+        if day == today.isoformat():
+            today_items = today_items + items
+    path_xp = sum(xp for items in path_info['by_day'].values() for _, xp in items) + path_info['chapter_xp']
+    # Books: chapters read, finished books, days a tracker was used (services/books.py)
+    from app.services import books
+    book_info = books.summary(db, user)
+    for day, items in book_info['by_day'].items():
+        per_day[day] = per_day.get(day, 0) + sum(xp for _, xp in items)
+        if day == today.isoformat():
+            today_items = today_items + items
+    book_xp = sum(xp for items in book_info['by_day'].values() for _, xp in items)
     history = [
         {'date': d, 'xp': per_day.get(d, 0)}
         for d in ((today - timedelta(days=back)).isoformat() for back in range(HISTORY_DAYS - 1, -1, -1))
@@ -106,7 +127,7 @@ def summary(db: Session, user: User) -> dict:
 
     from app.services import achievements
     bonus = achievements.xp_earned(db, user)
-    xp = activity + quests + GOAL_XP * reached + bonus
+    xp = activity + quests + GOAL_XP * reached + bonus + path_xp + book_xp
     level = level_for(xp)
     return {
         'level': level,
@@ -117,6 +138,6 @@ def summary(db: Session, user: User) -> dict:
         'next_level_xp': xp_for_level(level + 1),
         'today_xp': sum(value for _, value in today_items),
         'today': [{'reason': reason, 'xp': value} for reason, value in today_items],
-        'sources': {'activity': activity, 'quests': quests, 'goals': GOAL_XP * reached, 'achievements': bonus},
+        'sources': {'activity': activity, 'quests': quests, 'goals': GOAL_XP * reached, 'achievements': bonus, 'paths': path_xp, 'books': book_xp},
         'history': history,
     }

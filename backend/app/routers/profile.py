@@ -14,6 +14,7 @@ def _out(db: Session, user: User) -> ProfileOut:
     profile = profiles.get_profile(db, user)
     return ProfileOut.model_validate(profile).model_copy(update={
         "photo_url": photos.own_url(db, user), "title": achievements.worn_title(db, user),
+        "badge": achievements.featured(db, user),
     })
 
 

@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import DailyLog, Goal, GoalType, Income, Meal, PushupLog, Todo, User
-from app.services import baby_steps, nutrition, profiles
+from app.services import baby_steps, fasting, nutrition, profiles
 from app.services.character_stats import values, window
 
 
@@ -137,4 +137,5 @@ def stats_input(db: Session, user: User, day: date, start: date | None = None) -
             'currency': profiles.get_profile(db, user).currency,
         },
         'baby_steps': baby_steps.steps(profiles.get_profile(db, user).baby_steps),
+        'fasts': fasting.summaries(db, user, since),
     }

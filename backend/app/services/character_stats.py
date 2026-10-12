@@ -79,6 +79,7 @@ FOCUS_SCREEN_HOURS = [(0, 1), (2, 1), (3, 0.8), (4, 0.6), (5, 0.4), (7, 0.1), (8
 # A day is on target between 75% and 110% of the calorie target: below 75% is a crash diet, above is over.
 CALORIE_BAND = (0.75, 1.10)
 MEALS_A_DAY = 3
+FASTS_A_WEEK = 5  # completed fasts a week for a full fasting rhythm (H)
 # Weekly weight change as % of body weight. Losing 0.5-1%/week keeps muscle (Helms et al. 2014);
 # faster is scored a little lower, gaining while you mean to lose scores low.
 WEIGHT_RATE_OK = (0.2, 1.0)
@@ -345,6 +346,10 @@ def discipline(data, day, pushup_requirement):
     due = [t for t in data['todos'] if dates[0] <= t['deadline'] <= day]
     on_time = [t for t in due if t['completed'] and t.get('completion_date', '9999') <= t['deadline']]
 
+    fasts = [f for f in data.get('fasts', []) if dates[0] <= f['day'] <= day]
+    kept = sum(f['completed'] for f in fasts)
+    fasting = [component('Fasts kept', 1, rate(kept, len(fasts)), f'{kept}/{len(fasts)} fasts lasted their goal')] if fasts else []
+
     return combine([
         component('Daily check-ins', 1, rate(len(entries), span), f'{len(entries)}/{span} days'),
         component('Slept 7-9h', 1, rate(sum(7 <= h <= 9 for h in nights), len(nights)), f'{sum(7 <= h <= 9 for h in nights)}/{len(nights)} nights'),
@@ -354,6 +359,7 @@ def discipline(data, day, pushup_requirement):
         component('Tasks done on time', 1, rate(len(on_time), len(due)), f'{len(on_time)}/{len(due)} tasks'),
         component('Ate within calories', 1, rate(sum(calorie_ok(m['kcal'], calories) for m in meal_days), len(meal_days)) if calories else None,
                   f"{sum(calorie_ok(m['kcal'], calories) for m in meal_days)}/{len(meal_days)} days"),
+        *fasting,
     ])
 
 
@@ -399,6 +405,15 @@ def health(data, day):
     enough = len(logged) >= MIN_DAYS
     setup = 'add ' + ', '.join(targets.get('missing') or []) + ' in your profile' if targets.get('missing') else ''
 
+    # Fasting rhythm, for people who fast (any fast in the last 30 days): completed fasts this week, 5 = full
+    fasts = data.get('fasts', [])
+    month = last_dates(day, 30)
+    rhythm = []
+    if any(month[0] <= f['day'] <= day for f in fasts):
+        week = last_dates(day, 7)
+        done = sum(1 for f in fasts if f['completed'] and week[0] <= f['day'] <= day)
+        rhythm = [component('Fasting rhythm', 10, min(1, done / FASTS_A_WEEK), f'{done}/{FASTS_A_WEEK} fasts this week')]
+
     first = min(meals) if meals else None
     tracked = [d for d in last_dates(day, 7) if first and d >= first]
     logging = mean(min(1, meals.get(d, {}).get('count', 0) / MEALS_A_DAY) for d in tracked) if len(tracked) >= MIN_DAYS else None
@@ -415,6 +430,7 @@ def health(data, day):
         component('Meals logged', 20, logging, f'{MEALS_A_DAY} a day' if logging is not None else '',
                   f'needs {MIN_DAYS}+ days of meals'),
         component('Weight trend', 15, *weight_trend(data, day, targets.get('direction'))),
+        *rhythm,
     ])
 
 
@@ -500,10 +516,12 @@ def character_sheet(data, day, pushup_requirement=100, sleep_need=SLEEP_NEED, cu
     return {'stats': sheet, 'categories': categories, 'overall': round(mean(scores)) if scores else None}
 
 
-def category_scores(stat_scores):
-    """{category key: average of its stats that have data, or None}"""
+def category_scores(stat_scores, layout=None):
+    """{category key: average of its stats that have data, or None}. layout: a person's own class →
+    codes (sub_classes.personal_sheet); the standard grouping otherwise."""
     result = {}
-    for key, _, codes in CATEGORIES:
+    for key, _, standard in CATEGORIES:
+        codes = layout[key] if layout else standard
         known = [stat_scores[code] for code in codes if stat_scores.get(code) is not None]
         result[key] = round(mean(known)) if known else None
     return result

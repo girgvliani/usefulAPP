@@ -119,7 +119,10 @@ def delete_log(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="`field` needs a `section`")
     if section is not None and section not in DailyLogIn.model_fields:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unknown section '{section}'")
-    if field is not None:
+    if field is not None and section == "custom":
+        if not field.isdigit():  # answers to your own questions are keyed by sub-class id
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unknown field 'custom.{field}'")
+    elif field is not None:
         section_model = DailyLogIn.model_fields[section].annotation.__args__[0]  # SleepLog | None → SleepLog
         if field not in section_model.model_fields:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unknown field '{section}.{field}'")

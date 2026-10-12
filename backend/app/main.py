@@ -9,8 +9,8 @@ from slowapi.middleware import SlowAPIMiddleware
 from app.config import settings
 from app.rate_limit import limiter
 from app.routers import (
-    achievements, auth, browsing, customize, daily_logs, devices, friends, goals, money, photos, habits, income, life_areas, meals, milestones, profile, projects, questionnaire,
-    screen_time, sleep, social, stats, todos, xp,
+    achievements, auth, books, customize, daily_logs, devices, fasting, finances, friends, goals, money, photos, habits, income, life_areas, meals, milestones, profile, projects, questionnaire,
+    paths, screen_time, sleep, social, stats, sub_classes, todos, xp,
 )
 
 logger = logging.getLogger("life_rpg")
@@ -37,7 +37,8 @@ def unhandled_exception_handler(request: Request, exc: Exception):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_origin],
+    # One origin, or several separated by commas (the website and the Expo web app)
+    allow_origins=[origin.strip() for origin in settings.frontend_origin.split(',') if origin.strip()],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],  # PATCH: every edit (profile, goals, quests…)
     allow_headers=["Authorization", "Content-Type"],
@@ -63,11 +64,15 @@ app.include_router(goals.router)
 app.include_router(meals.router)
 app.include_router(questionnaire.router)
 app.include_router(friends.router)
-app.include_router(browsing.router)
 app.include_router(customize.router)
 app.include_router(money.router)
 app.include_router(achievements.router)
 app.include_router(photos.router)
+app.include_router(fasting.router)
+app.include_router(finances.router)
+app.include_router(sub_classes.router)
+app.include_router(paths.router)
+app.include_router(books.router)
 
 
 @app.get("/health")

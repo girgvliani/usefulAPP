@@ -60,10 +60,14 @@ def _priority(db: Session, user: User) -> dict:
 def morning(db: Session, user: User, sheet: dict) -> dict:
     """The biggest gain available today, leaning toward the categories you said matter most"""
     weight = _priority(db, user)
-    category_of = {code: key for key, _, codes in character_stats.CATEGORIES for code in codes}
-    names = dict(character_stats.STATS)
+    # A person's own sub-classes and classes when the sheet carries them (stats router), the standard ones otherwise
+    layout = sheet.get("layout") or {key: codes for key, _, codes in character_stats.CATEGORIES}
+    category_of = {code: key for key, codes in layout.items() for code in codes}
+    names = sheet.get("names") or dict(character_stats.STATS)
     best = None
     for code, result in sheet["stats"].items():
+        if code not in category_of:
+            continue  # a hidden stat
         move = result.get("best_move")
         if move:
             value = move["points"] * weight.get(category_of.get(code), 3)

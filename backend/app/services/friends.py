@@ -57,6 +57,7 @@ def global_board(db: Session, me: User) -> dict:
     for user in users:
         summary = levels.summary(db, user)
         rows.append({"id": user.id, "name": name_of(db, user), "photo_url": photos.public_url(db, user),
+                     "badge": achievements.featured(db, user),
                      "level": summary["level"], "title": achievements.worn_title(db, user) or summary["title"],
                      "xp": summary["xp"], "me": user.id == me.id})
     rows.sort(key=lambda r: (-r["xp"], r["name"]))
@@ -65,7 +66,8 @@ def global_board(db: Session, me: User) -> dict:
     mine = next((r for r in rows if r["me"]), None)
     if mine is None:  # hidden: show you where you'd be, without a rank
         summary = levels.summary(db, me)
-        mine = {"id": me.id, "name": name_of(db, me), "photo_url": photos.public_url(db, me), "level": summary["level"],
+        mine = {"id": me.id, "name": name_of(db, me), "photo_url": photos.public_url(db, me),
+                "badge": achievements.featured(db, me), "level": summary["level"],
                 "title": achievements.worn_title(db, me) or summary["title"], "xp": summary["xp"], "me": True, "rank": None}
     return {"players": len(rows), "top": rows[:GLOBAL_TOP], "you": mine}
 
@@ -123,7 +125,9 @@ def shared(db: Session, user: User, everything: bool = False, parts: tuple = SHA
     allowed = {key: True for key in SHARES} if everything else sharing(db, user)
     on = {key: allowed[key] and key in parts for key in SHARES}
     view = {"id": user.id, "name": name_of(db, user), "code": friend_code(db, user), "shares": allowed,
-            "photo_url": photos.public_url(db, user)}
+            "photo_url": photos.public_url(db, user),
+            # Shown whatever the switches say: you picked it to show
+            "badge": achievements.featured(db, user)}
     today = profiles.today(db, user)
 
     if on["level"]:

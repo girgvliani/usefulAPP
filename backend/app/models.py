@@ -240,6 +240,8 @@ class UserProfile(Base):
     # Achievements: the title worn (an achievement key), when the unlock screen was last seen, and
     # whether friends see your badges
     title_key: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    # The one earned badge shown on the corner of your profile photo (an achievement key), if you pick one
+    badge_key: Mapped[str | None] = mapped_column(String(40), nullable=True)
     achievements_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     share_achievements: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
     # Customization unlocked by level: {"off": {"MP": ["Meditation"]}, ...}
@@ -335,3 +337,108 @@ class ProfilePhoto(Base):
     token: Mapped[str] = mapped_column(String(40), unique=True, nullable=False)
     data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class Fast(Base):
+    """A fast: intermittent (a daily eating window) or extended (24 h or more). Running while ended_at
+    is empty; only one runs at a time (services/fasting.py)."""
+    __tablename__ = "fasts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    kind: Mapped[str] = mapped_column(String(12), nullable=False)  # intermittent / extended
+    goal_hours: Mapped[float] = mapped_column(Float, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    note: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
+
+class Subscription(Base):
+    """A subscription or recurring bill (services/finances.py). due_day keeps monthly dates on their day
+    of the month (the 31st stays the 31st after February)."""
+    __tablename__ = "subscriptions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    cycle: Mapped[str] = mapped_column(String(10), nullable=False)  # weekly / monthly / quarterly / yearly
+    next_due: Mapped[date] = mapped_column(Date, nullable=False)
+    due_day: Mapped[int] = mapped_column(Integer, nullable=False)
+    category: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    note: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    autopay: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    remind_days: Mapped[int] = mapped_column(Integer, nullable=False, default=2)
+    last_paid: Mapped[date | None] = mapped_column(Date, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class SubClass(Base):
+    """A sub-class a person made inside one of the six classes (services/sub_classes.py). The nine
+    standard stats are the built-in sub-classes; these are each person's own, fed by one measure."""
+    __tablename__ = "sub_classes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    class_key: Mapped[str] = mapped_column(String(12), nullable=False)  # mental / physical / practical / cultural / discipline / social
+    name: Mapped[str] = mapped_column(String(40), nullable=False)
+    icon: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    # number / yesno / rating (1-5, self-rated) are answered in the check-in; field reads a day-log value
+    kind: Mapped[str] = mapped_column(String(10), nullable=False)
+    field: Mapped[str | None] = mapped_column(String(40), nullable=True)  # "body.steps" for kind field
+    unit: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    target: Mapped[float | None] = mapped_column(Float, nullable=True)
+    period: Mapped[str] = mapped_column(String(5), nullable=False, default="day")  # day / week
+    better: Mapped[str] = mapped_column(String(4), nullable=False, default="more")  # more / less
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Made by a path (services/paths.py): which path and which of its sub-classes; None for your own
+    path_key: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    template_key: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    adjusted_at: Mapped[date | None] = mapped_column(Date, nullable=True)  # last weekly target adjustment
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class UserPath(Base):
+    """A path someone is on: who they want to become (services/paths.py). Leaving keeps the row and the
+    history; XP counts from started_on."""
+    __tablename__ = "user_paths"
+    __table_args__ = (UniqueConstraint("user_id", "path_key", name="uq_user_path"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    path_key: Mapped[str] = mapped_column(String(20), nullable=False)
+    started_on: Mapped[date] = mapped_column(Date, nullable=False)
+    left_on: Mapped[date | None] = mapped_column(Date, nullable=True)  # XP earned until then stays
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
+class UserBook(Base):
+    """A book someone has (services/books.py): unlocked by a path level or gifted by a friend, and which
+    chapters they've read ({index: day})."""
+    __tablename__ = "user_books"
+    __table_args__ = (UniqueConstraint("user_id", "book_key", name="uq_user_book"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    book_key: Mapped[str] = mapped_column(String(30), nullable=False)
+    via: Mapped[str] = mapped_column(String(10), nullable=False)  # level / gift
+    gifted_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True, nullable=True)
+    unlocked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    chapters_read: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+
+
+class BookEntry(Base):
+    """One thing logged in a book's tracker: a palace, a recall test, a card, a focus session, a decision…
+    The fields depend on the kind (books.ENTRY_FIELDS)."""
+    __tablename__ = "book_entries"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    book_key: Mapped[str] = mapped_column(String(30), nullable=False)
+    kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    day: Mapped[date] = mapped_column(Date, nullable=False)
+    data: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

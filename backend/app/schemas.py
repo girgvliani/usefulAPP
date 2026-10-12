@@ -1,8 +1,8 @@
 from datetime import date, datetime
-from typing import Literal
+from typing import Annotated, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 # ---- Auth ----
@@ -309,28 +309,26 @@ class SocialLog(LogSection):
     interactions: int | None = Field(default=None, ge=0, le=100)
 
 
-class BrowserLog(LogSection):
-    """Estimated minutes per category from an imported Chrome history (time until the next visit, at most 10 min)"""
-    work_min: int | None = minutes()
-    learning_min: int | None = minutes()
-    social_min: int | None = minutes()
-    entertainment_min: int | None = minutes()
-    shopping_min: int | None = minutes()
-    news_min: int | None = minutes()
-    other_min: int | None = minutes()
-    visits: int | None = Field(default=None, ge=0, le=100_000)
-    searches: int | None = Field(default=None, ge=0, le=100_000)
-    shorts: int | None = Field(default=None, ge=0, le=100_000)  # YouTube Shorts opened in the browser
+def _custom_values(values: dict | None) -> dict | None:
+    """Answers to a person's own check-in questions: sub-class id → number or yes/no"""
+    if values is None:
+        return None
+    for key, value in values.items():
+        if not key.isdigit() or len(key) > 12:
+            raise ValueError(f"Unknown sub-class '{key}'")
+        if not isinstance(value, bool) and not (0 <= value <= 1_000_000):
+            raise ValueError("Values go from 0 to 1,000,000")
+    return values
 
 
 class DailyLogIn(LogSection):
+    custom: Annotated[dict[str, bool | float] | None, AfterValidator(_custom_values)] = None
     sleep: SleepLog | None = None
     work: WorkLog | None = None
     mind: MindLog | None = None
     screen: ScreenLog | None = None
     body: BodyLog | None = None
     social: SocialLog | None = None
-    browser: BrowserLog | None = None
 
 
 class DailyLogBatchItem(DailyLogIn):
@@ -381,6 +379,9 @@ class StatResult(BaseModel):
     components: list[StatComponent]
     penalties: list[StatPenalty]
     off: list[str] = []  # parts the user turned off (customization)
+    custom: bool = False  # one of the person's own sub-classes
+    self_rated: bool = False  # a 1-5 self-rating rather than a measurement
+    icon: str | None = None
 
 
 class CategoryResult(BaseModel):
@@ -417,6 +418,7 @@ class ProfileOut(BaseModel):
     public_name: Literal["name", "nickname", "code"] = "nickname"  # what friends and the leaderboard see
     photo_url: str | None = None  # /photos/{token}.jpg, relative to the API
     title: str | None = None  # the achievement title you wear, if any
+    badge: dict | None = None  # the badge on your photo's corner: {key, icon, name, tier}
     currency: str
     timezone: str
     pushup_target: int

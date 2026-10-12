@@ -8,7 +8,7 @@ from app.database import get_db
 from app.deps import get_current_user
 from app.models import DailyScore, EpicMilestone, Habit, Income, LifeArea, User
 from app.schemas import CategoryResult, CharacterDay, CharacterSheetOut, DailyScoreOut, HabitStatus, LevelOut, StatResult, StatsOut, StreaksOut
-from app.services import achievements, character_stats, daily_logs, levels, profiles, rpg_logic, streaks, tips
+from app.services import sub_classes, achievements, character_stats, daily_logs, levels, profiles, rpg_logic, streaks, tips
 
 router = APIRouter(prefix="/stats", tags=["stats"])
 
@@ -45,11 +45,14 @@ def finalize_daily_summary(current_user: User = Depends(get_current_user), db: S
     return rpg_logic.finalize_daily_summary(db, current_user)
 
 
-def _sheet(db: Session, user: User, data: dict, day: date) -> dict:
-    """Shared formulas, personal targets, and the user's own customization (their view only)."""
+def _sheet(db: Session, user: User, data: dict, day: date, own: tuple | None = None) -> dict:
+    """Shared formulas, personal targets, and the user's own customization and sub-classes (their view
+    only). own: (custom sub-classes, hidden built-ins), loaded once when building many days."""
     profile = profiles.get_profile(db, user)
-    return character_stats.character_sheet(data, day.isoformat(), profile.pushup_target, profile.sleep_target,
-                                           profile.customization)
+    subs, hidden = own or (sub_classes.custom_subs(db, user, active_only=True), sub_classes.hidden_builtins(db, user))
+    sheet = character_stats.character_sheet(data, day.isoformat(), profile.pushup_target, profile.sleep_target,
+                                            profile.customization)
+    return sub_classes.personal_sheet(sheet, subs, hidden, data.get('daily_logs', {}), day.isoformat())
 
 
 @router.get("/character", response_model=CharacterSheetOut)
@@ -64,12 +67,13 @@ def character_sheet(day: date | None = None, current_user: User = Depends(get_cu
         overall=sheet['overall'],
         overall_grade=grade(sheet['overall']),
         categories=[
-            CategoryResult(key=key, name=name, score=sheet['categories'][key], grade=grade(sheet['categories'][key]), stats=codes)
-            for key, name, codes in character_stats.CATEGORIES
+            CategoryResult(key=key, name=name, score=sheet['categories'][key], grade=grade(sheet['categories'][key]),
+                           stats=sheet['layout'][key])
+            for key, name, _ in character_stats.CATEGORIES
         ],
         stats=[
-            StatResult(code=code, name=name, grade=grade(sheet['stats'][code]['score']), **sheet['stats'][code])
-            for code, name in character_stats.STATS
+            StatResult(code=code, name=sheet['names'][code], grade=grade(result['score']), **result)
+            for code, result in sheet['stats'].items()
         ],
     )
 
@@ -86,10 +90,11 @@ def character_history(
     if end < start or (end - start).days >= MAX_HISTORY_DAYS:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Range must be 1-{MAX_HISTORY_DAYS} days")
     data = daily_logs.stats_input(db, current_user, end, start)
+    own = (sub_classes.custom_subs(db, current_user, active_only=True), sub_classes.hidden_builtins(db, current_user))
     history = []
     for offset in range((end - start).days + 1):
         day = start + timedelta(days=offset)
-        sheet = _sheet(db, current_user, data, day)
+        sheet = _sheet(db, current_user, data, day, own)
         history.append(CharacterDay(
             date=day, overall=sheet['overall'], scores={code: stat['score'] for code, stat in sheet['stats'].items()},
             categories=sheet['categories'],

@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from app.models import (
     EarnedAchievement, EpicMilestone, Friendship, Goal, Income, ProfilePhoto, Project, QuestionnaireAttempt, Todo, User,
 )
-from app.services import baby_steps, daily_logs, goals, profiles
+from app.services import baby_steps, daily_logs, fasting, goals, profiles
 from app.services.character_stats import calorie_ok
 
 TIERS = {1: "Bronze", 2: "Silver", 3: "Gold", 4: "Legend"}
@@ -56,6 +56,7 @@ STORIES = [
     Story("scholar", "The Scholar", "🧠", "Deep work and real learning, logged hour by hour."),
     Story("ramsey", "Ramsey's Way", "💰", "Dave Ramsey's Baby Steps, from the first $1,000 to building wealth and giving."),
     Story("fuel", "Fuel", "🍽️", "You can't out-train a bad diet. Log what you eat and stay within your calories."),
+    Story("fasting", "The Fast", "⏳", "Hunger is a feeling, not an emergency. From a 16-hour window to three days on water."),
     Story("people", "Your People", "🤝", "Life is better with others. Friends in the app, and real time with people."),
     Story("adventurer", "The Adventurer", "🗺️", "Goals, quests, milestones and levels: the long game."),
     Story("firsts", "First Steps", "✨", "Getting to know the app, and yourself."),
@@ -120,6 +121,14 @@ ACHIEVEMENTS = [
     A("meals_week", "fuel", "🥗", "Logged Week", "Log 3+ meals a day, 7 days in a row.", "meals3_streak", 7, "days in a row", 200, 2),
     A("calories_week", "fuel", "⚖️", "On Target", "Log 3+ meals and stay within your calories, 7 days in a row.", "calories_streak", 7, "days in a row", 400, 3, "Clean Eater"),
     A("weight_5", "fuel", "📉", "Five Down", "Weigh 5 kg less than your first logged weight.", "weight_lost_kg", 5, "kg", 500, 3),
+    # Fasting: timed on the phone or the website
+    A("fast_first", "fasting", "⏳", "First Fast", "Complete a fast of 12 hours or more (☰ → Fasting).", "fast_longest_completed_h", 12, "h", 50, 1),
+    A("fast_16", "fasting", "🌗", "Sixteen Eight", "Complete a 16-hour fast.", "fast_longest_completed_h", 16, "h", 100, 1),
+    A("fast_week", "fasting", "🗓️", "Window Week", "Complete a fast every day, 7 days in a row.", "fast_streak", 7, "days in a row", 300, 2, "Disciplined Eater"),
+    A("fast_24", "fasting", "🌑", "Dinner to Dinner", "Complete a 24-hour fast.", "fast_longest_completed_h", 24, "h", 300, 2),
+    A("fast_48", "fasting", "🔥", "Two Days", "Complete a 48-hour fast.", "fast_longest_completed_h", 48, "h", 600, 3, "Iron Stomach"),
+    A("fast_72", "fasting", "🏜️", "Three Days on Water", "Complete a 72-hour fast (only with experience; check with a doctor).", "fast_longest_completed_h", 72, "h", 1200, 4, "Desert Monk"),
+    A("fast_50", "fasting", "⌛", "Fifty Fasts", "Complete 50 fasts.", "fasts_completed", 50, "fasts", 500, 3),
     # People
     A("friend_first", "people", "🤝", "Plus One", "Add your first friend (Friends).", "friends", 1, "friends", 50, 1),
     A("friends_5", "people", "👥", "Party of Five", "Have 5 friends in the app.", "friends", 5, "friends", 200, 2),
@@ -138,7 +147,6 @@ ACHIEVEMENTS = [
     A("questionnaire", "firsts", "🧭", "Know Thyself", "Take the questionnaire.", "questionnaires", 1, "", 50, 1),
     A("photo", "firsts", "🖼️", "Face Reveal", "Add a profile photo (Profile & targets / Settings).", "has_photo", 1, "", 25, 1),
     A("customize", "firsts", "🎛️", "Tinkerer", "Turn a part of a stat off (Customize, LV 7).", "parts_off", 1, "", 25, 1),
-    A("browsing", "firsts", "🌐", "Know Your Habits", "Import your Chrome history (website → Browsing).", "browser_days", 1, "days", 50, 1),
 ]
 BY_KEY = {a.key: a for a in ACHIEVEMENTS}
 TITLES = {a.key: a.title for a in ACHIEVEMENTS if a.title}
@@ -207,6 +215,8 @@ def facts(db: Session, user: User, level: int | None = None) -> dict:
     def count(model, *where):
         return db.scalar(select(func.count()).select_from(model).where(*where)) or 0
 
+    fasted = [f for f in fasting.summaries(db, user, date(2000, 1, 1)) if f['completed']]
+
     if level is None:
         from app.services import levels
         level = levels.summary(db, user)['level']
@@ -256,7 +266,9 @@ def facts(db: Session, user: User, level: int | None = None) -> dict:
         'questionnaires': count(QuestionnaireAttempt, QuestionnaireAttempt.user_id == user.id),
         'has_photo': count(ProfilePhoto, ProfilePhoto.user_id == user.id),
         'parts_off': int(any((profile.customization or {}).get('off', {}).values())),
-        'browser_days': sum(1 for e in days.values() if e.get('browser')),
+        'fasts_completed': len(fasted),
+        'fast_longest_completed_h': max((f['hours'] for f in fasted), default=0),
+        'fast_streak': _streak({date.fromisoformat(f['day']): {} for f in fasted}, lambda e: True),
     }
 
 
@@ -329,6 +341,26 @@ def wear(db: Session, user: User, key: str | None) -> None:
     db.commit()
 
 
+def featured(db: Session, user: User) -> dict | None:
+    """The badge you chose for the corner of your profile photo, while you still have it"""
+    key = profiles.get_profile(db, user).badge_key
+    if not key or key not in BY_KEY or key not in earned_rows(db, user):
+        return None
+    a = BY_KEY[key]
+    return {"key": a.key, "icon": a.icon, "name": a.name, "tier": a.tier}
+
+
+def feature(db: Session, user: User, key: str | None) -> None:
+    """Shows an earned badge on your profile photo (None: no badge)"""
+    if key is not None:
+        if key not in BY_KEY:
+            raise ValueError("No such achievement")
+        if key not in earned_rows(db, user):
+            raise ValueError("Earn it first")
+    profiles.get_profile(db, user).badge_key = key
+    db.commit()
+
+
 def overview(db: Session, user: User) -> dict:
     """Every achievement with how to get it and your progress, grouped into stories"""
     have = earned_rows(db, user)
@@ -353,6 +385,7 @@ def overview(db: Session, user: User) -> dict:
     return {
         "earned": len(have), "total": len(ACHIEVEMENTS), "xp": sum(BY_KEY[k].xp for k in have),
         "title": profiles.get_profile(db, user).title_key if worn_title(db, user) else None,
+        "badge": (featured(db, user) or {}).get("key"),
         "stories": stories, "achievements": items,
     }
 
